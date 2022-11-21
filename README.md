@@ -1,6 +1,6 @@
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
-| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" |
+| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
 | `GLAB_TOKEN` | Token to access gitlab API | False | String | Null |
 | `NEW_RELIC_API_KEY` | New Relic License Key | False | String | Null |
 | `GLAB_EXPORT_GROUPS_REGEX` | Regex to match group names against | False | Boolean | None |

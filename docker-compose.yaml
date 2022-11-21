@@ -9,10 +9,10 @@ services:
       - new-relic-exporter-base
     build:
       context: ./new-relic-metrics-exporter
-    image: ghcr.io/newrelic-experimental/gitlab/new-relic-metrics-exporter:test
+    image: ghcr.io/newrelic-experimental/gitlab/new-relic-metrics-exporter:1.0.0
   new-relic-exporter:
     depends_on:
       - new-relic-exporter-base
     build:
       context: ./new-relic-exporter
-    image: ghcr.io/newrelic-experimental/gitlab/new-relic-exporter:test
+    image: ghcr.io/newrelic-experimental/gitlab/new-relic-exporter:1.0.0
