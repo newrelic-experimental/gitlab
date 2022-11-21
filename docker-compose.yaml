@@ -1,0 +1,22 @@
+version: '3.9'
+services:
+  new-relic-exporter-base:
+    build:
+      context: ./new-relic-exporter-base
+    image: docker.io/dpacheconr/gitlab-exporter-base:1.0.0
+  new-relic-metrics-exporter:
+    environment:
+      - VERSION=$VERSION
+    depends_on:
+      - new-relic-exporter-base
+    build:
+      context: ./new-relic-metrics-exporter
+    image: docker.io/dpacheconr/gitlab-metrics-exporter:$VERSION
+  new-relic-exporter:
+    environment:
+      - VERSION=$VERSION
+    depends_on:
+      - new-relic-exporter-base
+    build:
+      context: ./new-relic-exporter
+    image: docker.io/dpacheconr/gitlab-exporter:$VERSION
