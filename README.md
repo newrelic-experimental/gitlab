@@ -16,6 +16,27 @@
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/newrelic-experimental/tls-proxy)
 
 
+## How to monitor Gitlab with New Relic
+
+Now, you can monitor your Gitlab data with New Relic using New Relic Exporter and Metrics Exporter, making it easier to get observability into your CI/CD pipeline health and performance.
+
+Using these exporters you will be able to:
+
+    Visualise key metrics on your Gitlab pipelines, such as how long your jobs are taking, how often they are failing
+
+    Visualise jobs and pipeline executions as distributed traces with logs in context
+
+    Pinpoint where issues are coming from in your pipelines.
+
+    Create alerts on your Gitlab pipelines.
+
+The next image shows a New Relic dashboard with some of the Gitlab metrics you’ll be able to visualise.
+
+## Gitlab Dashboard
+
+![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
+
+
 # New Relic Exporter
 
 
@@ -45,26 +66,6 @@
 | `GLAB_DIMENSION_METRICS` | Extra dimensional metric attributes to add to each metric | True | List* | status,stage,name |
 | `GLAB_STANDALONE` | Set to True if not running as gitlab pipeline schedule | True | Boolean | False |
 *comma separated
-
-## How to send METL data from Gitlab to New Relic
-
-Now, you can monitor your Gitlab data with New Relic using New Relic Exporter and Metrics Exporter, making it easier to get observability into your CI/CD pipeline health and performance.
-
-You will be able to:
-
-Visualise key metrics on your Gitlab pipelines, such as how long your jobs are taking, how often they are failing
-
-Visualise jobs and pipeline executions as distributed traces with logs in context
-
-Pinpoint where issues are coming from in your pipelines.
-
-Create alerts on your Gitlab pipelines.
-
-The next image shows a New Relic dashboard with some of the Gitlab metrics you’ll be able to visualise.
-
-## Gitlab Dashboard
-
-![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
 
 
 ## Capabilites to add in releases 
