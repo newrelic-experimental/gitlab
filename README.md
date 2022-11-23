@@ -50,9 +50,9 @@
 ![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
 
 
-# TODO
-Dora Metrics
-Sidekiq Metrics
+## Future Releases
+>Dora Metrics
+>Sidekiq Metrics
 
 ## Contributing
 
