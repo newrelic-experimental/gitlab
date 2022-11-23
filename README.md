@@ -52,6 +52,7 @@
 
 ## Future Releases
 >Dora Metrics
+<br />
 >Sidekiq Metrics
 
 ## Contributing
