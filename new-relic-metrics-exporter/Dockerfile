@@ -1,4 +1,4 @@
-FROM ghcr.io/newrelic-experimental/gitlab/new-relic-exporter-base:1.0.0
+FROM dpacheconr/gitlab-exporter-base:1.0.0
 
 WORKDIR /app
 

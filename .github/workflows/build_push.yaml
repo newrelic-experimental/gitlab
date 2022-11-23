@@ -2,8 +2,8 @@ name: build and push
 
 on:
   push:
-    branches: main
-
+    branches-ignore: main
+    
 jobs:
   login:
     runs-on: ubuntu-latest
@@ -15,13 +15,12 @@ jobs:
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v2
       with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-      
+        registry: docker.io
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     - name: Build containers
-      run: docker-compose build --pull
+      run:  export VERSION=${GITHUB_REF#refs/heads/}  && docker-compose build
 
     - name: Push containers
-      run: docker-compose push
+      run: export VERSION=${GITHUB_REF#refs/heads/} && docker-compose push

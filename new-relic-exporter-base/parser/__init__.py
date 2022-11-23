@@ -11,8 +11,12 @@ def do_string(string):
 def do_parse(string):
     return string != "" and string is not None and string != "None"
 
-def check_env_vars():
-    keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY","GLAB_EXPORT_PROJECTS_REGEX")
+def check_env_vars(metrics):
+    if metrics:
+        keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY", "GLAB_EXPORT_PROJECTS_REGEX", "GLAB_EXPORT_GROUPS_REGEX")
+    else:
+        keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY")
+
     keys_not_set = []
 
     for key in keys:
@@ -39,8 +43,14 @@ def grab_span_att_vars():
 
         atts_to_remove=["NEW_RELIC_API_KEY","GITLAB_FEATURES","CI_SERVER_TLS_CA_FILE","CI_RUNNER_TAGS","CI_JOB_JWT","CI_JOB_JWT_V1","CI_JOB_JWT_V2","GLAB_TOKEN","GIT_ASKPASS","CI_COMMIT_BEFORE_SHA","CI_BUILD_TOKEN","CI_DEPENDENCY_PROXY_PASSWORD","CI_RUNNER_SHORT_TOKEN","CI_BUILD_BEFORE_SHA","CI_BEFORE_SHA","OTEL_EXPORTER_OTEL_ENDPOINT"]
         if "GLAB_ENVS_DROP" in os.environ:
-            attributes=os.getenv('GLAB_ENVS_DROP')
-            atts_to_remove.append(attributes.split(","))
+            try:
+                if os.getenv("GLAB_ENVS_DROP") != "": 
+                    user_envs_to_drop =str(os.getenv("GLAB_ENVS_DROP")).split(",")
+                    for attribute in user_envs_to_drop:
+                        atts_to_remove.append(attribute)
+            except:
+                print("Unable to parse GLAB_ENVS_DROP, check your configuration")
+                
         for item in atts_to_remove:
             atts.pop(item, None)      
 
@@ -53,10 +63,16 @@ def parse_attributes(obj):
     obj_atts = {}
     attributes_to_drop = [""]
     if "GLAB_ATTRIBUTES_DROP" in os.environ:
-        attributes=os.getenv('GLAB_ATTRIBUTES_DROP')
-        attributes_to_drop.append(attributes.split(","))
+        try:
+            if os.getenv("GLAB_ATTRIBUTES_DROP") != "": 
+                user_attributes_to_drop =str(os.getenv("GLAB_ATTRIBUTES_DROP")).lower().split(",")
+                for attribute in user_attributes_to_drop:
+                    attributes_to_drop.append(attribute)
+        except:
+            print("Unable to parse GLAB_ATTRIBUTES_DROP, check your configuration")
+
     for attribute in obj:
-        attribute_name = str(attribute)
+        attribute_name = str(attribute).lower()
         if attribute_name not in attributes_to_drop:
             if do_parse(obj[attribute]):
                 if type(obj[attribute]) is dict:
@@ -102,13 +118,20 @@ def parse_attributes(obj):
     return obj_atts
 
 def parse_metrics_attributes(attributes):
-    metrics_attributes_to_keep = ["status","stage","name"]
+    metrics_attributes_to_keep = ["service.name","status","stage","name"]
     metrics_attributes = {}
     if "GLAB_DIMENSION_METRICS" in os.environ:
-        metrics_attributes_to_keep.append(str(os.environ("GLAB_DIMENSION_METRICS")).split(","))
+        try:
+            if os.getenv("GLAB_DIMENSION_METRICS") != "": 
+                user_attributes_to_keep = str(os.getenv("GLAB_DIMENSION_METRICS")).lower().split(",")
+                for attribute in user_attributes_to_keep:
+                    metrics_attributes_to_keep.append(attribute)
+        except:
+            print("Unable to parse GLAB_DIMENSION_METRICS, exporting with default dimensions, check your configuration")
+
     for attribute in attributes:
-        if str(attribute) in metrics_attributes_to_keep: #Choose attributes to keep as dimensions
-            metrics_attributes[attribute]=attributes[attribute]
+        if str(attribute).lower() in metrics_attributes_to_keep: #Choose attributes to keep as dimensions
+            metrics_attributes[str(attribute).lower()]=attributes[str(attribute).lower()]
 
     if "queued_duration" in attributes:
         queued_duration=float(attributes["queued_duration"])

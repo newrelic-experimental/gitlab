@@ -1,7 +1,8 @@
 import json
 import logging
 import os
-from os.path import exists
+from datetime import datetime, timedelta
+import pytz
 from parser import (check_env_vars, do_parse, do_string, do_time,
                     grab_span_att_vars, parse_attributes)
 
@@ -12,11 +13,19 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.trace import Status, StatusCode
 from otel import create_resource_attributes, get_logger, get_tracer
 
-GLAB_SERVICE_NAME = ""
+
+GLAB_EXPORT_LOGS = True
 
 def send_to_nr():
-    check_env_vars()
+    check_env_vars(metrics=False)
+
+    # Set variables
+    global GLAB_EXPORT_LOGS 
+    GLAB_TOKEN = os.getenv('GLAB_TOKEN')
     NEW_RELIC_API_KEY = os.getenv('NEW_RELIC_API_KEY')
+    project_id = os.getenv('CI_PROJECT_ID')
+    pipeline_id = os.getenv('CI_PARENT_PIPELINE')
+    
     if "OTEL_EXPORTER_OTEL_ENDPOINT" in os.environ:
         OTEL_EXPORTER_OTEL_ENDPOINT = os.getenv('OTEL_EXPORTER_OTEL_ENDPOINT')
     else: 
@@ -27,20 +36,20 @@ def send_to_nr():
         
     if "GLAB_EXPORT_LOGS" in os.environ:
         GLAB_EXPORT_LOGS = os.getenv('GLAB_EXPORT_LOGS')
-    else:
-        GLAB_EXPORT_LOGS=True
+        if GLAB_EXPORT_LOGS.lower() == "false":
+            GLAB_EXPORT_LOGS = False
 
-    GLAB_TOKEN = os.getenv('GLAB_TOKEN')
-    
     # Set gitlab client
     gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
 
     # Set gitlab project/pipeline/jobs details
-    project_id = os.getenv('CI_PROJECT_ID')
     project = gl.projects.get(project_id)
-    pipeline_id = os.getenv('CI_PARENT_PIPELINE')
     pipeline = project.pipelines.get(pipeline_id)
     project_full_name = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
+    GLAB_SERVICE_NAME = project_full_name
+    if "GLAB_SERVICE_NAME" in os.environ:
+        GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
+
     jobs = pipeline.jobs.list()
     job_lst=[]
     for job in jobs:
@@ -48,18 +57,13 @@ def send_to_nr():
         if (job_json['name']) not in ["new-relic-exporter", "new-relic-metrics-exporter"]:
             job_lst.append(job_json)
 
-    global GLAB_SERVICE_NAME
-    
-    if "GLAB_SERVICE_NAME" in os.environ:
-        GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
-    else:
-        GLAB_SERVICE_NAME=project_full_name
-
     #Set variables to use for OTEL metrics and logs exporters
     global_resource = Resource(attributes={
     SERVICE_NAME: GLAB_SERVICE_NAME,
     "pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),
     "project_id": str(os.getenv('CI_PROJECT_ID')),
+    "gitlab.source": "gitlab-exporter",
+    "gitlab.resource.type": "span"
     })
     endpoint="{}".format(OTEL_EXPORTER_OTEL_ENDPOINT)
     headers="api-key={}".format(NEW_RELIC_API_KEY)
@@ -77,12 +81,12 @@ def send_to_nr():
     # Create a new root span(use start_span to manually end span with timestamp)
     p_parent = tracer.start_span(name=GLAB_SERVICE_NAME + " - pipeline: "+os.getenv('CI_PARENT_PIPELINE'), attributes=atts, start_time=do_time(str(pipeline_att['started_at'])))
     try:
-        for item in pipeline_att:
-            if item in ("user","detailed_status"):
-                for i in pipeline_att[item]:
-                    p_parent.set_attribute(do_string(item)+"."+str(i),str(pipeline_att[item][i]))
+        for attribute in pipeline_att:
+            if type(attribute) is dict:
+                for sub_att in pipeline_att[attribute]:
+                    p_parent.set_attribute(do_string(attribute)+"."+str(sub_att),str(pipeline_att[attribute][sub_att]))
             else:
-                p_parent.set_attribute(do_string(item),str(pipeline_att[item]))
+                p_parent.set_attribute(do_string(attribute),str(pipeline_att[attribute]))
 
         if pipeline_att['status'] == "failed":
             p_parent.set_status(Status(StatusCode.ERROR,"Pipeline failed, check jobs for more details")) 
@@ -92,7 +96,7 @@ def send_to_nr():
         for job in job_lst:
             #Set job level tracer and logger
             job_attributes = parse_attributes(job)
-            resource_attributes ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"])}
+            resource_attributes ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"gitlab.source": "gitlab-exporter","gitlab.resource.type": "span"}
             resource_attributes.update(create_resource_attributes(job_attributes,GLAB_SERVICE_NAME ))
             resource_log = Resource(attributes=resource_attributes)
             job_tracer = get_tracer(endpoint, headers, resource_log, "job_tracer")
@@ -138,13 +142,14 @@ def send_to_nr():
                                                 err = True
                                                 
                                     with open("job.log", "rb") as f:
-                                        resource_attributes_base ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"])}
+                                        resource_attributes_base ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"gitlab.source": "gitlab-exporter","gitlab.resource.type": "span"}
                                         if err:
                                             count = 1
                                             for string in f:
                                                 if string.decode('utf-8') != "\n":
                                                     if count == 1:
                                                         resource_attributes["message"] = string.decode('utf-8')
+                                                        resource_attributes.update(resource_attributes_base)
                                                         resource_log = Resource(attributes=resource_attributes)
                                                         job_logger = get_logger(endpoint,headers,resource_log, "job_logger")
                                                         job_logger.error("")
@@ -171,15 +176,16 @@ def send_to_nr():
                                                         job_logger.info("")
                                                 count += 1
 
-                                    # n = 3500
-                                    # chunks = [log_data[i:i+n] for i in range(0, len(log_data), n)]
                                 except Exception as e:
                                     print(e)
                             else:
-                                print("Not configured to send logs New Relic, skipping")    
+                                print("Not configured to send logs New Relic, skip...")    
 
                         finally:
                             child.end(end_time=do_time(job['finished_at']))
+
+                if job == (len(job_lst)-1):
+                    print(job)
 
             except Exception as e:
                 print(e)      
@@ -190,5 +196,4 @@ def send_to_nr():
 
     finally:
         p_parent.end(end_time=do_time(str(pipeline_att['finished_at'])))
-
 send_to_nr()
