@@ -47,8 +47,6 @@ def send_to_nr():
     pipeline = project.pipelines.get(pipeline_id)
     project_full_name = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
     GLAB_SERVICE_NAME = project_full_name
-    if "GLAB_SERVICE_NAME" in os.environ:
-        GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
 
     jobs = pipeline.jobs.list()
     job_lst=[]

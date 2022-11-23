@@ -66,12 +66,6 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 *comma separated
 
 
-## Capabilites to add in releases 
-Dora Metrics
-<br />
-Sidekiq Metrics
-<br />
-
 ## Contributing
 
 We encourage your contributions to improve [Gitlab Exporters](../../)! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project. If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company, please drop us an email at opensource@newrelic.com.

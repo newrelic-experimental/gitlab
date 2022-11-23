@@ -14,7 +14,7 @@ import re
 
 # Default global variables values
 GLAB_STANDALONE=False
-GLAB_EXPORT_LAST_MINUTES = 60
+GLAB_EXPORT_LAST_MINUTES = 61
 GLAB_EXPORT_NON_GROUP_PROJECTS = False
 
 # Check if we running as pipeline schedule or standalone mode
@@ -23,7 +23,7 @@ if "GLAB_STANDALONE" in os.environ:
 
 # Check if we using default amount data to export
 if "GLAB_EXPORT_LAST_MINUTES" in os.environ:
-    GLAB_EXPORT_LAST_MINUTES = int(os.getenv('GLAB_EXPORT_LAST_MINUTES'))
+    GLAB_EXPORT_LAST_MINUTES = int(os.getenv('GLAB_EXPORT_LAST_MINUTES'))+1
 
 # Check if we should export non group projects
 if "GLAB_EXPORT_NON_GROUP_PROJECTS" in os.environ:
@@ -67,9 +67,6 @@ def send_to_nr():
         project = gl.projects.get(project.attributes.get('id'))
         project_full_name = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
         GLAB_SERVICE_NAME = project_full_name
-        if "GLAB_SERVICE_NAME" in os.environ:
-            GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
-
         project_json = json.loads(project.to_json())
         attributes_p ={
         "gitlab.source": "gitlab-metrics-exporter",
@@ -122,8 +119,6 @@ def send_to_nr():
                 current_project = gl.projects.get(project_id)
                 current_project_full_name = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
                 GLAB_SERVICE_NAME=current_project_full_name
-                if "GLAB_SERVICE_NAME" in os.environ:
-                    GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
                 attributes_e ={
                 "gitlab.source": "gitlab-metrics-exporter",
                 "gitlab.resource.type": "environment"
@@ -158,8 +153,6 @@ def send_to_nr():
                 current_project = gl.projects.get(projects)
                 current_project_full_name = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
                 GLAB_SERVICE_NAME=current_project_full_name
-                if "GLAB_SERVICE_NAME" in os.environ:
-                    GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
                 attributes_d ={
                 "gitlab.source": "gitlab-metrics-exporter",
                 "gitlab.resource.type": "deployment"
@@ -195,8 +188,6 @@ def send_to_nr():
                 current_project = gl.projects.get(project_id)
                 current_project_full_name = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
                 GLAB_SERVICE_NAME=current_project_full_name
-                if "GLAB_SERVICE_NAME" in os.environ:
-                    GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
                 attributes_r ={
                 "gitlab.source": "gitlab-metrics-exporter",
                 "gitlab.resource.type": "release"
@@ -249,8 +240,6 @@ def send_to_nr():
                 current_project = gl.projects.get(project_id)
                 current_project_full_name = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
                 GLAB_SERVICE_NAME=current_project_full_name
-                if "GLAB_SERVICE_NAME" in os.environ:
-                    GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
                 current_pipeline = current_project.pipelines.get(pipeline_id)
                 current_pipeline_json = json.loads(current_pipeline.to_json())
                 #Grab pipeline attributes
@@ -320,8 +309,6 @@ def send_to_nr():
             runner_json = json.loads(runner.to_json())
             current_project_full_name = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
             GLAB_SERVICE_NAME=current_project_full_name
-            if "GLAB_SERVICE_NAME" in os.environ:
-                    GLAB_SERVICE_NAME = os.getenv('GLAB_SERVICE_NAME')
             if str(runner_json ["is_shared"]).lower() == "false":
                 attributes_run = {
                 "gitlab.source": "gitlab-metrics-exporter",
