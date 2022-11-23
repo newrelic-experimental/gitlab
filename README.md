@@ -19,15 +19,19 @@
 ## How to monitor Gitlab with New Relic
 
 Now, you can monitor your Gitlab data with New Relic using New Relic Exporter and Metrics Exporter, making it easier to get observability into your CI/CD pipeline health and performance.
-
+<br />
 Using these exporters you will be able to:
-
-> Visualise key metrics on your Gitlab pipelines, such as how long your jobs are taking, how often they are failing
->Visualise jobs and pipeline executions as distributed traces with logs in context 
->Pinpoint where issues are coming from in your pipelines.
->Create alerts on your Gitlab pipelines.
-
+<br />
+Visualise key metrics on your Gitlab pipelines, such as how long your jobs are taking, how often they are failing
+<br />
+Visualise jobs and pipeline executions as distributed traces with logs in context 
+<br />
+Pinpoint where issues are coming from in your pipelines.
+<br />
+Create alerts on your Gitlab pipelines.
+<br />
 The next image shows a New Relic dashboard with some of the Gitlab metrics you’ll be able to visualise.
+<br />
 
 ## Gitlab Dashboard
 
