@@ -46,11 +46,12 @@
 | `GLAB_STANDALONE` | Set to True if not running as gitlab pipeline schedule | True | Boolean | False |
 *comma separated
 
+## Gitlab Dashboard
 
 ![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
 
 
-## Future Releases 
+## Capabilites to add in releases 
 Dora Metrics
 <br />
 Sidekiq Metrics
