@@ -50,10 +50,11 @@
 ![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
 
 
-## Future Releases
->Dora Metrics
+## Future Releases 
+Dora Metrics
 <br />
->Sidekiq Metrics
+Sidekiq Metrics
+<br />
 
 ## Contributing
 
