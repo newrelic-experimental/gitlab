@@ -77,7 +77,7 @@ def send_to_nr():
     #Configure spans
     pipeline_att = json.loads(pipeline.to_json())
     # Create a new root span(use start_span to manually end span with timestamp)
-    p_parent = tracer.start_span(name=GLAB_SERVICE_NAME + " - pipeline: "+os.getenv('CI_PARENT_PIPELINE'), attributes=atts, start_time=do_time(str(pipeline_att['started_at'])))
+    p_parent = tracer.start_span(name=GLAB_SERVICE_NAME + " - pipeline: "+os.getenv('CI_PARENT_PIPELINE'), kind="server", attributes=atts, start_time=do_time(str(pipeline_att['started_at'])))
     try:
         for attribute in pipeline_att:
             if type(attribute) is dict:
@@ -101,11 +101,11 @@ def send_to_nr():
             try:
                 if (job['status']) == "skipped":
                     # Create a new child span for every valid job, set it as the current span in context
-                    child = job_tracer.start_span(name="Stage: " + str(job['name'])+" - job_id: "+ str(job['id']) + "- SKIPPED",context=pcontext)
+                    child = job_tracer.start_span(name="Stage: " + str(job['name'])+" - job_id: "+ str(job['id']) + "- SKIPPED",context=pcontext, kind="consumer")
                     child.end()
                 else:
                     # Create a new child span for every valid job, set it as the current span in context
-                    child = job_tracer.start_span(name="Stage: " + str(job['name'])+" - job_id: "+ str(job['id']), start_time=do_time(job['started_at']),context=pcontext)
+                    child = job_tracer.start_span(name="Stage: " + str(job['name'])+" - job_id: "+ str(job['id']), start_time=do_time(job['started_at']),context=pcontext, kind="consumer")
                     with trace.use_span(child, end_on_exit=False):
                         try:
                             if job['status'] == "failed":
