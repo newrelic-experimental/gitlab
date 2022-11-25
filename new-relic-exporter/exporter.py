@@ -48,12 +48,17 @@ def send_to_nr():
     project_full_name = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
     GLAB_SERVICE_NAME = project_full_name
 
-    jobs = pipeline.jobs.list()
+    jobs = pipeline.jobs.list(get_all=True)
     job_lst=[]
+    #Ensure we don't export data for new relic exporters
     for job in jobs:
         job_json = json.loads(job.to_json())
-        if (job_json['name']) not in ["new-relic-exporter", "new-relic-metrics-exporter"]:
+        if str(job_json['stage']).lower() not in ["new-relic-exporter", "new-relic-metrics-exporter"]:
             job_lst.append(job_json)
+            
+    if len(job_lst) == 0:
+        print("No data to export, assuming this pipeline jobs are new relic exporters")
+        exit(0)
 
     #Set variables to use for OTEL metrics and logs exporters
     global_resource = Resource(attributes={
