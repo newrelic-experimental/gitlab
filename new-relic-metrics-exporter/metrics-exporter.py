@@ -53,7 +53,12 @@ def send_to_nr():
             OTEL_EXPORTER_OTEL_ENDPOINT = "https://otlp.nr-data.net:4318"
         
     # Set gitlab client
-    gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
+    GLAB_ENDPOINT = ""
+    if "GLAB_ENDPOINT" in os.environ:
+        GLAB_ENDPOINT = os.getenv('GLAB_ENDPOINT')
+        gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT),private_token="{}".format(GLAB_TOKEN))
+    else:
+        gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
 
     #Set variables to use for OTEL metrics and logs exporters
     endpoint="{}".format(OTEL_EXPORTER_OTEL_ENDPOINT)

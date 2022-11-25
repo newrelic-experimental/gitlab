@@ -45,6 +45,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 | `NEW_RELIC_API_KEY` | New Relic License Key | False | String | None |
 | `GLAB_SERVICE_NAME` | New Relic OTEL entity name | True | String | True |
 | `GLAB_EXPORT_LOGS` | Export job logs to New Relic | True | Boolean | True |
+| `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 
 
 # New Relic Metrics Exporter
@@ -52,6 +53,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
 | `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
+| `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_TOKEN` | Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | New Relic License Key | False | String | None |
 | `GLAB_SERVICE_NAME` | New Relic OTEL entity name | True | String | Project name |

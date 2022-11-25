@@ -13,7 +13,6 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.trace import Status, StatusCode
 from otel import create_resource_attributes, get_logger, get_tracer
 
-
 GLAB_EXPORT_LOGS = True
 
 def send_to_nr():
@@ -40,7 +39,12 @@ def send_to_nr():
             GLAB_EXPORT_LOGS = False
 
     # Set gitlab client
-    gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
+    GLAB_ENDPOINT = ""
+    if "GLAB_ENDPOINT" in os.environ:
+        GLAB_ENDPOINT = os.getenv('GLAB_ENDPOINT')
+        gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT),private_token="{}".format(GLAB_TOKEN))
+    else:
+        gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
 
     # Set gitlab project/pipeline/jobs details
     project = gl.projects.get(project_id)
