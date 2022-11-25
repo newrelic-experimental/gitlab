@@ -65,6 +65,8 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 | `GLAB_STANDALONE` | Set to True if not running as gitlab pipeline schedule | True | Boolean | False |
 *comma separated
 
+## How to 
+> Link to follow
 
 ## Contributing
 
