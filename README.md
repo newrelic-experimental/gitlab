@@ -66,6 +66,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 *comma separated
 
 ## How to 
+
 > Link to follow
 
 ## Contributing
