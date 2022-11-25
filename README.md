@@ -1,10 +1,7 @@
 
-# BETA: New Relic Metrics Exporter
-
-
 [![New Relic Experimental header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Experimental.png)](https://opensource.newrelic.com/oss-category/#new-relic-experimental)
 
-# New Relic Gitlab Exporters
+# BETA: New Relic Gitlab Exporters
 >Monitor Gitlab with OpenTelemetry and New Relic quickstarts
 
 ![GitHub forks](https://img.shields.io/github/forks/newrelic-experimental/tls-proxy?style=social)
