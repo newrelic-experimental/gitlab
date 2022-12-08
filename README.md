@@ -65,7 +65,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 
 ## How to 
 
-> Link to follow
+> https://newrelic.com/blog/how-to-relic/monitor-gitlab-with-opentelemetry
 
 Alternative to running new relic metrics exporter as pipeline schedule:
 Rather than running in a GitLab pipeline the New Relic Metrics exporter can also  be run independently enabling standalone mode. To run in Docker for instance run the following:
