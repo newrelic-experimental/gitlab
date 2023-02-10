@@ -7,7 +7,7 @@ import zulu
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from otel import get_logger, get_meter, create_resource_attributes
-from parser import check_env_vars, parse_attributes, parse_metrics_attributes, do_string
+from custom_parsers import check_env_vars, parse_attributes, parse_metrics_attributes, do_string
 import schedule
 import time
 import re
@@ -16,7 +16,16 @@ import re
 GLAB_STANDALONE=False
 GLAB_EXPORT_LAST_MINUTES = 61
 GLAB_EXPORT_NON_GROUP_PROJECTS = False
+GLAB_PROJECT_OWNERSHIP=True
+GLAB_PROJECT_VISIBILITY="private"
 
+# Check project ownership and visibility
+if "GLAB_PROJECT_OWNERSHIP" in os.environ:
+    GLAB_PROJECT_OWNERSHIP = os.getenv('GLAB_PROJECT_OWNERSHIP')
+    
+if "GLAB_PROJECT_VISIBILITY" in os.environ:
+    GLAB_PROJECT_VISIBILITY = os.getenv('GLAB_PROJECT_VISIBILITY')
+    
 # Check if we running as pipeline schedule or standalone mode
 if "GLAB_STANDALONE" in os.environ:
     GLAB_STANDALONE = os.getenv('GLAB_STANDALONE')
@@ -66,7 +75,7 @@ def send_to_nr():
     LoggingInstrumentor().instrument(set_logging_format=True)
 
     #Collect project information
-    projects = gl.projects.list(owned=True,get_all=True)
+    projects = gl.projects.list(owned=GLAB_PROJECT_OWNERSHIP,visibility=GLAB_PROJECT_VISIBILITY,get_all=True)
     project_ids= []
     for project in projects:
         project = gl.projects.get(project.attributes.get('id'))
@@ -107,17 +116,20 @@ def send_to_nr():
         exit (1)
 
     #Collect environments information
-    environments_ids_lst = []
+    environments_ids = {}
     for project_id in project_ids:
-        current_project = gl.projects.get(project_id)
-        environments = current_project.environments.list(get_all=True, sort='desc')
-        environments_ids = {}
-        for environment in environments:
-            environment_json = json.loads(environment.to_json())
-            if zulu.parse(environment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                    environments_ids_lst.append(environment_json["id"])
-                    environments_ids[project_id]=environments_ids_lst
-
+        try:
+            current_project = gl.projects.get(project_id)
+            environments = current_project.environments.list(get_all=True, sort='desc')
+            environments_ids_lst = []
+            for environment in environments:
+                environment_json = json.loads(environment.to_json())
+                if zulu.parse(environment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                        environments_ids_lst.append(environment_json["id"])
+                        environments_ids[project_id]=environments_ids_lst
+        except Exception as e:
+            print(project_id,e)
+            
     if len(environments_ids) > 0:
         for project_id in environments_ids:
             for environments_id in environments_ids[project_id]:
@@ -139,18 +151,22 @@ def send_to_nr():
                 print("Log events sent for environment: " + str(environment_json['name']))
     else:
         print("No environments created in last " + str(GLAB_EXPORT_LAST_MINUTES) + " minutes")
+        
 
     deployments_ids = {}
     #Collect deployments information
     for project_id in project_ids:
-        current_project = gl.projects.get(project_id)
-        deployments = current_project.deployments.list(get_all=True, sort='desc')
-        deployments_ids_lst = []
-        for deployment in deployments:
-            deployment_json = json.loads(deployment.to_json())
-            if zulu.parse(deployment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                    deployments_ids_lst.append(deployment_json["id"])
-                    deployments_ids[project_id]=deployments_ids_lst
+        try:
+            current_project = gl.projects.get(project_id)
+            deployments = current_project.deployments.list(get_all=True, sort='desc')
+            deployments_ids_lst = []
+            for deployment in deployments:
+                deployment_json = json.loads(deployment.to_json())
+                if zulu.parse(deployment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                        deployments_ids_lst.append(deployment_json["id"])
+                        deployments_ids[project_id]=deployments_ids_lst
+        except Exception as e:
+            print(project_id,e)
 
     if len(deployments_ids) > 0:
         for projects in deployments_ids:
@@ -178,14 +194,17 @@ def send_to_nr():
     releases_tag_name = {}
     #Collect releases information
     for project_id in project_ids:
-        current_project = gl.projects.get(project_id)
-        releases = current_project.releases.list(get_all=True, sort='desc')
-        releases_tag_name_lst = []
-        for release in releases:
-            release_json = json.loads(release.to_json())
-            if zulu.parse(release_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                    releases_tag_name_lst.append(release_json["tag_name"])
-                    releases_tag_name[project_id]=releases_tag_name_lst
+        try:
+            current_project = gl.projects.get(project_id)
+            releases = current_project.releases.list(get_all=True, sort='desc')
+            releases_tag_name_lst = []
+            for release in releases:
+                release_json = json.loads(release.to_json())
+                if zulu.parse(release_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                        releases_tag_name_lst.append(release_json["tag_name"])
+                        releases_tag_name[project_id]=releases_tag_name_lst
+        except Exception as e:
+            print(project_id,e)
 
     if len(releases_tag_name) > 0:
          for project_id in releases_tag_name:
@@ -212,17 +231,20 @@ def send_to_nr():
     #Collect pipeline information
     pipeline_ids = {}
     for project_id in project_ids:
-        current_project = gl.projects.get(project_id)
-        print("Gathering pipeline data for project " + str(project_id) + " this may take while...")
-        pipelines = current_project.pipelines.list(get_all=True, sort='desc')
-        pipeline_ids_lst = []
-        for pipeline in pipelines:
-            pipeline_json = json.loads(pipeline.to_json())
-            if pipeline_json['id'] not in pipeline_ids_lst:
-                if zulu.parse(pipeline_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                    pipeline_ids_lst.append(pipeline_json['id'])
-                    pipeline_ids[project_id]=pipeline_ids_lst
-
+        try:
+            current_project = gl.projects.get(project_id)
+            print("Gathering pipeline data for project " + str(project_id) + " this may take while...")
+            pipelines = current_project.pipelines.list(get_all=True, sort='desc')
+            pipeline_ids_lst = []
+            for pipeline in pipelines:
+                pipeline_json = json.loads(pipeline.to_json())
+                if pipeline_json['id'] not in pipeline_ids_lst:
+                    if zulu.parse(pipeline_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                        pipeline_ids_lst.append(pipeline_json['id'])
+                        pipeline_ids[project_id]=pipeline_ids_lst
+        except Exception as e:
+            print(project_id,e)
+            
     #Ensure we don't export data for exporters jobs
     current_pipeline_ids = {}
     for project_id in pipeline_ids:
@@ -238,7 +260,7 @@ def send_to_nr():
                     if current_pipeline_json['id'] not in current_pipeline_ids_lst:
                         current_pipeline_ids_lst.append(current_pipeline_json['id'])
                         current_pipeline_ids[project_id]=current_pipeline_ids_lst
-
+        
     if len(current_pipeline_ids) > 0:
         for project_id in current_pipeline_ids:
             for pipeline_id in current_pipeline_ids[project_id]:

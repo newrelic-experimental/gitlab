@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 import pytz
-from parser import (check_env_vars, do_parse, do_string, do_time,
+from custom_parsers import (check_env_vars, do_parse, do_string, do_time,
                     grab_span_att_vars, parse_attributes)
 
 import gitlab

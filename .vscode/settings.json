@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./new-relic-metrics-exporter",
+        "./new-relic-exporter-base"
+    ]
+}
