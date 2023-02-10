@@ -1,4 +1,4 @@
-FROM dpacheconr/gitlab-exporter-base:1.0.0
+FROM dpacheconr/gitlab-exporter-base:1.0.1
 
 WORKDIR /app
 
