@@ -30,7 +30,6 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 
 ![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
 
-
 # New Relic Exporter
 
 | Variables | Description | Optional | Values | Default |
