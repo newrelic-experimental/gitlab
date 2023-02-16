@@ -1,9 +1,9 @@
 name: build and push
 
 on:
-  push:
-    branches-ignore: main
-    
+  release:
+  workflow_dispatch:
+  
 jobs:
   login:
     runs-on: ubuntu-latest
