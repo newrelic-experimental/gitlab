@@ -9,14 +9,13 @@ def init():
     # global variables 
     global GLAB_STANDALONE
     global GLAB_EXPORT_LAST_MINUTES
-    global GLAB_EXPORT_NON_GROUP_PROJECTS
     global GLAB_PROJECT_OWNERSHIP
     global GLAB_PROJECT_VISIBILITY
     global GLAB_SERVICE_NAME
     global NEW_RELIC_API_KEY
     global GLAB_TOKEN
     global GLAB_EXPORT_PROJECTS_REGEX
-    global GLAB_EXPORT_GROUPS_REGEX
+    global GLAB_EXPORT_PATHS
     global GLAB_ENDPOINT
     global gl
     global OTEL_EXPORTER_OTEL_ENDPOINT
@@ -25,21 +24,27 @@ def init():
     
     GLAB_STANDALONE=False
     GLAB_EXPORT_LAST_MINUTES=61
-    GLAB_EXPORT_NON_GROUP_PROJECTS = False
     GLAB_PROJECT_OWNERSHIP=True
     GLAB_PROJECT_VISIBILITY="private"
     GLAB_SERVICE_NAME="gitlab-exporter" # default -> updates dynamically with each project name 
     NEW_RELIC_API_KEY = os.getenv('NEW_RELIC_API_KEY')
     GLAB_TOKEN = os.getenv('GLAB_TOKEN')
     GLAB_EXPORT_PROJECTS_REGEX = os.getenv('GLAB_EXPORT_PROJECTS_REGEX')
-    GLAB_EXPORT_GROUPS_REGEX = os.getenv('GLAB_EXPORT_GROUPS_REGEX')
+    GLAB_EXPORT_PATHS = ""
 
-   
+    # Check base path
+    if "GLAB_EXPORT_PATHS" in os.environ:
+        GLAB_EXPORT_PATHS = os.getenv('GLAB_EXPORT_PATHS')
+    else:
+        if "CI_PROJECT_NAMESPACE" in os.environ:
+            GLAB_EXPORT_PATHS = os.getenv('CI_PROJECT_NAMESPACE')
+        
+        
     # Set gitlab client
     GLAB_ENDPOINT = ""
     if "GLAB_ENDPOINT" in os.environ:
         GLAB_ENDPOINT = os.getenv('GLAB_ENDPOINT')
-        gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT),private_token="{}".format(GLAB_TOKEN))
+        gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT),private_token="{}".format(GLAB_TOKEN),obey_rate_limit=False)
     else:
         gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
 

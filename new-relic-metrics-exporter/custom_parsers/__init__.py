@@ -13,7 +13,7 @@ def do_parse(string):
 
 def check_env_vars(metrics):
     if metrics:
-        keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY", "GLAB_EXPORT_PROJECTS_REGEX", "GLAB_EXPORT_GROUPS_REGEX")
+        keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY", "GLAB_EXPORT_PATHS", "GLAB_EXPORT_PROJECTS_REGEX")
     else:
         keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY")
 
@@ -30,7 +30,8 @@ def check_env_vars(metrics):
             print(key + " not set")
         exit(1)
     else:
-        print("All required environment variables set, starting new-relic-exporter.")
+        pass
+        # All required environment variables set, starting new-relic-exporter
 
 def grab_span_att_vars():
     # Grab list enviroment variables to set as span attributes
@@ -41,7 +42,7 @@ def grab_span_att_vars():
             if not att.startswith('CI') | att.startswith('GIT') | att.startswith('GLAB') | att.startswith('NEW') | att.startswith('OTEL') :
                 atts.pop(att,None)
 
-        atts_to_remove=["NEW_RELIC_API_KEY","GITLAB_FEATURES","CI_SERVER_TLS_CA_FILE","CI_RUNNER_TAGS","CI_JOB_JWT","CI_JOB_JWT_V1","CI_JOB_JWT_V2","GLAB_TOKEN","GIT_ASKPASS","CI_COMMIT_BEFORE_SHA","CI_BUILD_TOKEN","CI_DEPENDENCY_PROXY_PASSWORD","CI_RUNNER_SHORT_TOKEN","CI_BUILD_BEFORE_SHA","CI_BEFORE_SHA","OTEL_EXPORTER_OTEL_ENDPOINT"]
+        atts_to_remove=["NEW_RELIC_API_KEY","GITLAB_FEATURES","CI_SERVER_TLS_CA_FILE","CI_RUNNER_TAGS","CI_JOB_JWT","CI_JOB_JWT_V1","CI_JOB_JWT_V2","GLAB_TOKEN","GIT_ASKPASS","CI_COMMIT_BEFORE_SHA","CI_BUILD_TOKEN","CI_DEPENDENCY_PROXY_PASSWORD","CI_RUNNER_SHORT_TOKEN","CI_BUILD_BEFORE_SHA","CI_BEFORE_SHA","OTEL_EXPORTER_OTEL_ENDPOINT","GLAB_EXPORT_PATHS","GLAB_EXPORT_PROJECTS_REGEX"]
         if "GLAB_ENVS_DROP" in os.environ:
             try:
                 if os.getenv("GLAB_ENVS_DROP") != "": 

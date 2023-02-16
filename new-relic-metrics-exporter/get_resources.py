@@ -1,5 +1,4 @@
 import json
-import os
 from datetime import datetime, timedelta
 import pytz
 import zulu
@@ -9,7 +8,11 @@ from custom_parsers import parse_attributes
 import global_variables as var
 from custom_parsers import parse_attributes, parse_metrics_attributes
 from otel import get_logger, get_meter, create_resource_attributes
+from custom_parsers import parse_attributes, do_string
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
+import re
 
+# Initialize variables
 var.init()  
 
 GLAB_EXPORT_LAST_MINUTES = var.GLAB_EXPORT_LAST_MINUTES
@@ -17,111 +20,129 @@ GLAB_SERVICE_NAME = var.GLAB_SERVICE_NAME
 endpoint = var.endpoint
 headers = var.headers
 gl = var.gl
+GLAB_EXPORT_PATHS = var.GLAB_EXPORT_PATHS
+GLAB_EXPORT_PROJECTS_REGEX = var.GLAB_EXPORT_PROJECTS_REGEX
 
+LoggingInstrumentor().instrument(set_logging_format=True)
+
+def grab_data(project):
+    #Collect project information
+    GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
+    project_json = json.loads(project.to_json())
+    attributes_p ={
+    "gitlab.source": "gitlab-metrics-exporter",
+    "gitlab.resource.type": "project"
+    }
+    attributes = create_resource_attributes(parse_attributes(project_json), GLAB_SERVICE_NAME)
+    attributes.update(attributes_p)
+    project_resource = Resource(attributes=attributes)
+    project_logger = get_logger(endpoint,headers,project_resource,"project_logger")
+    # Check if we should export only data for specific groups/projects
+    if len(GLAB_EXPORT_PATHS) != "":
+        paths = GLAB_EXPORT_PATHS.split(",")
+        for path in paths:          
+            if str(project_json["namespace"]["full_path"]) == (str(path)):
+                if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
+                    #Send project information as log events with attributes
+                    project_logger.info("Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) + " data")
+                    get_all_resources(project)
+                    print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))
+                else:
+                    print("No project name matched configured regex " + "\"" + str(GLAB_EXPORT_PROJECTS_REGEX)+ "\" in path " + "\""+str(path)+"\"")
+    else:
+        print("GLAB_EXPORT_PATH not configured")          
+    
+def get_all_resources(current_project):
+    #Collect environments information
+    get_environments(current_project)
+    #Collect deployments information
+    get_deployments(current_project)
+    #Collect releases information
+    get_releases(current_project)
+    #Collect runners information
+    get_runners(current_project)
+    
 def get_environments (current_project):
-    environments_ids = {}
     project_id = json.loads(current_project.to_json())["id"]
+    GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
     try:
         environments = current_project.environments.list(get_all=True, sort='desc')
-        environments_ids_lst = []
-        for environment in environments:
-            environment_json = json.loads(environment.to_json())
-            if zulu.parse(environment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                    environments_ids_lst.append(environment_json["id"])
-                    environments_ids[project_id]=environments_ids_lst
+        if len(environments) > 0: # check if there are environments in this project
+            for environment in environments:
+                environment_json = json.loads(environment.to_json())
+                if zulu.parse(environment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                    attributes_e ={
+                    "gitlab.source": "gitlab-metrics-exporter",
+                    "gitlab.resource.type": "environment"
+                    }
+                    environment = current_project.environments.get(environment_json['id'])
+                    environment_attributes = create_resource_attributes(parse_attributes(environment_json),GLAB_SERVICE_NAME)
+                    environment_attributes.update(attributes_e)
+                    environment_resource = Resource(attributes=environment_attributes)
+                    environment_logger = get_logger(endpoint,headers,environment_resource,"environment_logger")
+                    #Send environment data as log events with attributes                  
+                    environment_logger.info("Environment: "+ str(environment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) + " data")
+                    print("Log events sent for environment: " + str(environment_json['id'])+ " from project: " + str(project_id))
+            
     except Exception as e:
         print(current_project['id'],e)
-    
-    if len(environments_ids) > 0:
-        for project_id in environments_ids:
-            for environments_id in environments_ids[project_id]:
-                attributes_e ={
-                "gitlab.source": "gitlab-metrics-exporter",
-                "gitlab.resource.type": "environment"
-                }
-                environment = current_project.environments.get(environments_id)
-                environment_json = json.loads(environment.to_json())
-                environment_attributes = create_resource_attributes(parse_attributes(environment_json),GLAB_SERVICE_NAME)
-                environment_attributes.update(attributes_e)
-                environment_resource = Resource(attributes=environment_attributes)
-                environment_logger = get_logger(endpoint,headers,environment_resource,"environment_logger")
-                #Send runner data as log events with attributes
-                environment_logger.info("Environment: "+ str(environment_json['name']) + " data")
-                print("Log events sent for environment: " + str(environment_json['name']))
-    else:
-        print("No environments created in last " + str(GLAB_EXPORT_LAST_MINUTES) + " minutes")
         
 def get_deployments (current_project):
-    deployments_ids = {}
     project_id = json.loads(current_project.to_json())["id"]
+    GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
     try:
         deployments = current_project.deployments.list(get_all=True, sort='desc')
-        deployments_ids_lst = []
-        for deployment in deployments:
-            deployment_json = json.loads(deployment.to_json())
-            if zulu.parse(deployment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                    deployments_ids_lst.append(deployment_json["id"])
-                    deployments_ids[project_id]=deployments_ids_lst
-    except Exception as e:
-        print(project_id,e)
-
-    if len(deployments_ids) > 0:
-        for projects in deployments_ids:
-            for deployment_id in deployments_ids[projects]:
-                attributes_d ={
-                "gitlab.source": "gitlab-metrics-exporter",
-                "gitlab.resource.type": "deployment"
-                }
-                deployment = current_project.deployments.get(deployment_id)
+        if len(deployments) > 0: # check if there are deployments in this project
+            for deployment in deployments:
                 deployment_json = json.loads(deployment.to_json())
-                deployment_attributes = create_resource_attributes(parse_attributes(deployment_json), GLAB_SERVICE_NAME)
-                deployment_attributes.update(attributes_d)
-                deployment_resource = Resource(attributes=deployment_attributes)
-                deployment_logger = get_logger(endpoint,headers,deployment_resource,"deployment_logger")
-                #Send runner data as log events with attributes
-                deployment_logger.info("Deployment: "+ str(deployment_json['id']) + " data")
-                print("Log events sent for deployment: " + str(deployment_json['id']))
-    else:
-        print("No deployments created in last " + str(GLAB_EXPORT_LAST_MINUTES) + " minutes")
-
+                if zulu.parse(deployment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                    attributes_d ={
+                    "gitlab.source": "gitlab-metrics-exporter",
+                    "gitlab.resource.type": "deployment"
+                    }
+                    deployment = current_project.deployments.get(deployment_json['id'])
+                    deployment_attributes = create_resource_attributes(parse_attributes(deployment_json), GLAB_SERVICE_NAME)
+                    deployment_attributes.update(attributes_d)
+                    deployment_resource = Resource(attributes=deployment_attributes)
+                    deployment_logger = get_logger(endpoint,headers,deployment_resource,"deployment_logger")
+                    #Send deployment data as log events with attributes
+                    deployment_logger.info("Deployment: "+ str(deployment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) + " data")
+                    print("Log events sent for deployment: " + str(deployment_json['id'])+ " from project: " + str(project_id))           
+                
+    except Exception as e:
+        print(current_project['id'],e)
 
 def get_releases(current_project):
-    releases_tag_name = {}
     project_id = json.loads(current_project.to_json())["id"]
+    GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
     #Collect releases information
     try:
         releases = current_project.releases.list(get_all=True, sort='desc')
-        releases_tag_name_lst = []
-        for release in releases:
-            release_json = json.loads(release.to_json())
-            if zulu.parse(release_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                    releases_tag_name_lst.append(release_json["tag_name"])
-                    releases_tag_name[project_id]=releases_tag_name_lst
-    except Exception as e:
-        print(project_id,e)
-
-    if len(releases_tag_name) > 0:
-         for project_id in releases_tag_name:
-            for release_name in releases_tag_name[project_id]:
-                attributes_r ={
-                "gitlab.source": "gitlab-metrics-exporter",
-                "gitlab.resource.type": "release"
-                }
-                release = current_project.releases.get(release_name)
+        if len(releases) > 0: # check if there are releases in this project
+            for release in releases:
                 release_json = json.loads(release.to_json())
-                release_attributes = create_resource_attributes(parse_attributes(release_json),GLAB_SERVICE_NAME)
-                release_attributes.update(attributes_r)
-                release_resource = Resource(attributes=release_attributes)
-                release_logger = get_logger(endpoint,headers,release_resource,"release_logger")
-                #Send runner data as log events with attributes
-                release_logger.info("Release: "+ str(release_json['name']) + " data")
-                print("Log events sent for release: " + str(release_json['name']))
-    else:
-        print("No releases created in last " + str(GLAB_EXPORT_LAST_MINUTES) + " minutes")
+                if zulu.parse(release_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                    attributes_r ={
+                    "gitlab.source": "gitlab-metrics-exporter",
+                    "gitlab.resource.type": "release"
+                    }
+                    release = current_project.releases.get(release)
+                    release_json = json.loads(release.to_json())
+                    release_attributes = create_resource_attributes(parse_attributes(release_json),GLAB_SERVICE_NAME)
+                    release_attributes.update(attributes_r)
+                    release_resource = Resource(attributes=release_attributes)
+                    release_logger = get_logger(endpoint,headers,release_resource,"release_logger")
+                    #Send releases data as log events with attributes
+                    release_logger.info("Release: "+ str(release_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) + " data")
+                    print("Log events sent for release: " + str(release_json['id'])+ " from project: " + str(project_id))
+            
+    except Exception as e:
+        print(current_project['id'],e)
 
 def get_runners(current_project):
     project_id = json.loads(current_project.to_json())["id"]
     runners = current_project.runners.list(get_all=True)
+    GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
     for runner in runners:
         runner_json = json.loads(runner.to_json())
         if str(runner_json ["is_shared"]).lower() == "false":
@@ -134,11 +155,11 @@ def get_runners(current_project):
             runner_resource = Resource(attributes=runner_attributes)
             runner_logger = get_logger(endpoint,headers,runner_resource,"runner_logger")
             #Send runner data as log events with attributes
-            runner_logger.info("Runner: "+ str(runner_json['id']) + " data")
-            print("Log events sent for runner: " + str(runner_json['id']))
+            runner_logger.info("Runner: "+ str(runner_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) + " data")
+            print("Log events sent for runner: " + str(runner_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
 
 def get_pipelines(current_project):
-    
+    project_id = json.loads(current_project.to_json())["id"]
     #Collect pipeline information
     pipeline_ids = {}
     project_id = json.loads(current_project.to_json())["id"]
@@ -191,7 +212,7 @@ def get_pipelines(current_project):
                 pipeline_resource = Resource(attributes=current_pipeline_attributes)
                 pipeline_logger = get_logger(endpoint,headers,pipeline_resource,"pipeline_logger")
                 #Send pipeline data as log events with attributes
-                pipeline_logger.info("Pipeline: "+ str(pipeline_id) + " data")
+                pipeline_logger.info("Pipeline: "+ str(pipeline_id) + str(GLAB_SERVICE_NAME) + " data")
                 print("Metrics sent for pipeline: " + str(pipeline_id))
                 print("Log events sent for pipeline: " + str(pipeline_id))
                 jobs = current_pipeline.jobs.list()
@@ -221,8 +242,8 @@ def get_pipelines(current_project):
                     job_resource = Resource(attributes=current_job_attributes)
                     job_logger = get_logger(endpoint,headers,job_resource,"job_logger")
                     #Send job data as log events with attributes
-                    job_logger.info("Job: "+ str(job_json['id']) + " data")
-                    print("Metrics sent for job: " + str(job_json['id']))
-                    print("Log events sent for job: " + str(job_json['id']) + " for pipeline: "+ str(pipeline_id))
+                    job_logger.info("Job: "+ str(job_json['id']) + str(GLAB_SERVICE_NAME) + " data")
+                    print("Metrics sent for job: " + str(job_json['id'])+ " from project: " + str(current_project['id']))
+                    print("Log events sent for job: " + str(job_json['id']) + " for pipeline: "+ str(pipeline_id)+ " from project: " + str(current_project['id']))
     else:
-        print("No pipelines ran in last " + str(GLAB_EXPORT_LAST_MINUTES) + " minutes for any project.")
+        print("No pipelines ran in last " + str(int(GLAB_EXPORT_LAST_MINUTES)-1) + " minutes" + "for project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))

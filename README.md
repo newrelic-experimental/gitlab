@@ -43,16 +43,18 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you�
 
 
 # New Relic Metrics Exporter
-
+    GLAB_PROJECT_OWNERSHIP=True
+    GLAB_PROJECT_VISIBILITY="private"
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
 | `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_TOKEN` | MASKED - Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
-| `GLAB_EXPORT_GROUPS_REGEX` | Regex to match group  names against “.*” for all | False | Boolean | None |
+| `GLAB_PROJECT_OWNERSHIP` | Project ownership | False | String | True |
+| `GLAB_PROJECT_VISIBILITY` | Project visibility | False | String | private |
+| `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against “.*” for all | False | Boolean | None |
-| `GLAB_EXPORT_NON_GROUP_PROJECTS` | Enable if we should export non group projects, i.e. user projects | True | Boolean | False |
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
 | `GLAB_ATTRIBUTES_DROP` | Attributes to drop from logs and spans events | True | List* | None |
 | `GLAB_DIMENSION_METRICS` | Extra dimensional metric attributes to add to each metric | True | List* | NONE Note the following attributes will always be set as dimensions regardless of this setting: status,stage,name |
