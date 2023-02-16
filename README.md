@@ -43,8 +43,6 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 
 
 # New Relic Metrics Exporter
-    GLAB_PROJECT_OWNERSHIP=True
-    GLAB_PROJECT_VISIBILITY="private"
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
 | `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
