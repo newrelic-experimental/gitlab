@@ -8,7 +8,7 @@ from custom_parsers import parse_attributes
 import global_variables as var
 from custom_parsers import parse_attributes, parse_metrics_attributes
 from otel import get_logger, get_meter, create_resource_attributes
-from custom_parsers import parse_attributes, do_string
+from custom_parsers import parse_attributes
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 import re
 
