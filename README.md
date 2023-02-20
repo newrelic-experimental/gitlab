@@ -41,7 +41,6 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_LOW_DATA_MODE` | export only bear minimum data (only recommended during testing) | True | Boolean | False |
 
-
 # New Relic Metrics Exporter
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
