@@ -11,11 +11,8 @@ def do_string(string):
 def do_parse(string):
     return string != "" and string is not None and string != "None"
 
-def check_env_vars(metrics):
-    if metrics:
-        keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY", "GLAB_EXPORT_PROJECTS_REGEX")
-    else:
-        keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY")
+def check_env_vars():
+    keys = ("GLAB_TOKEN","NEW_RELIC_API_KEY")
 
     keys_not_set = []
 
@@ -33,7 +30,7 @@ def check_env_vars(metrics):
         pass # All required environment variables set
         
 
-def grab_span_att_vars():
+def grab_span_att_vars():            
     # Grab list enviroment variables to set as span attributes
     try:
         atts = os.environ
@@ -51,7 +48,7 @@ def grab_span_att_vars():
                         atts_to_remove.append(attribute)
             except:
                 print("Unable to parse GLAB_ENVS_DROP, check your configuration")
-                
+        
         for item in atts_to_remove:
             atts.pop(item, None)      
 
