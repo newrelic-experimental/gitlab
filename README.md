@@ -39,6 +39,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
 | `GLAB_EXPORT_LOGS` | Export job logs to New Relic | True | Boolean | True |
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
+| `GLAB_LOW_DATA_MODE` | export only bear minimum data (only recommended during testing) | True | Boolean | False |
 
 
 # New Relic Metrics Exporter

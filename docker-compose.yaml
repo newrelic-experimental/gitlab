@@ -3,7 +3,7 @@ services:
   new-relic-exporter-base:
     build:
       context: ./new-relic-exporter-base
-    image: docker.io/dpacheconr/gitlab-exporter-base:1.0.1
+    image: docker.io/dpacheconr/gitlab-exporter-base:latest
     platform: linux/amd64
   new-relic-metrics-exporter:
     environment:

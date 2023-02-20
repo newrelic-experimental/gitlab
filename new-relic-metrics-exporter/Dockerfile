@@ -1,9 +1,7 @@
-FROM dpacheconr/gitlab-exporter-base:1.0.1
+FROM dpacheconr/gitlab-exporter-base
 
 WORKDIR /app
 
-COPY get_resources.py .
-COPY global_variables.py .
-COPY main.py .
+COPY . .
 
 ENTRYPOINT [ "python3", "-u" , "main.py"]
