@@ -60,7 +60,7 @@ else:
 GLAB_ENDPOINT = ""
 if "GLAB_ENDPOINT" in os.environ:
     GLAB_ENDPOINT = os.getenv('GLAB_ENDPOINT')
-    gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT),private_token="{}".format(GLAB_TOKEN),obey_rate_limit=False)
+    gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT),private_token="{}".format(GLAB_TOKEN))
 else:
     gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
 
