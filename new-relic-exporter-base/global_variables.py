@@ -22,7 +22,9 @@ global endpoint
 global headers
 global paths
 global GLAB_EXPORT_LOGS
+global GLAB_DORA_METRICS
 
+GLAB_DORA_METRICS = False
 GLAB_EXPORT_LOGS = True
 GLAB_STANDALONE=False
 GLAB_EXPORT_LAST_MINUTES=61
@@ -34,6 +36,12 @@ GLAB_TOKEN = os.getenv('GLAB_TOKEN')
 GLAB_EXPORT_PROJECTS_REGEX =".*"
 GLAB_EXPORT_PATHS = ""
 
+# Check export logs is set
+if "GLAB_DORA_METRICS" in os.environ and os.getenv('GLAB_DORA_METRICS').lower() == "true":
+    GLAB_DORA_METRICS = os.getenv('GLAB_DORA_METRICS')
+else:
+    GLAB_EXPORT_LOGS = False
+    
 # Check export logs is set
 if "GLAB_EXPORT_LOGS" in os.environ and os.getenv('GLAB_EXPORT_LOGS').lower() == "false":
     GLAB_EXPORT_LOGS = os.getenv('GLAB_EXPORT_LOGS')
@@ -62,6 +70,7 @@ if "GLAB_ENDPOINT" in os.environ:
     GLAB_ENDPOINT = os.getenv('GLAB_ENDPOINT')
     gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT),private_token="{}".format(GLAB_TOKEN))
 else:
+    GLAB_ENDPOINT="https://gitlab.com/"
     gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
 
 # Check project ownership and visibility

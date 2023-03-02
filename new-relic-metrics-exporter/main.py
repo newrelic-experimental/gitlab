@@ -8,7 +8,6 @@ def send_to_nr():
     try:
         for project in projects:
             grab_data(project)
-
     except Exception as e:
         print(e)
         
