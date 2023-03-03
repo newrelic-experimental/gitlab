@@ -1,7 +1,7 @@
 
 [![New Relic Experimental header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Experimental.png)](https://opensource.newrelic.com/oss-category/#new-relic-experimental)
 
-# BETA: New Relic Gitlab Exporters
+# New Relic Gitlab Exporters
 >Monitor Gitlab with OpenTelemetry and New Relic quickstarts
 
 ![GitHub forks](https://img.shields.io/github/forks/newrelic-experimental/tls-proxy?style=social)
@@ -50,6 +50,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you‚Ä
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
 | `GLAB_PROJECT_OWNERSHIP` | Project ownership | False | String | True |
 | `GLAB_PROJECT_VISIBILITY` | Project visibility | False | String | private |
+| `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | False | Bool | False |
 | `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against ‚Äú.*‚Äù for all | False | Boolean | None |
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
@@ -69,7 +70,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you‚Ä
 Alternative to running new relic metrics exporter as pipeline schedule:
 Rather than running in a GitLab pipeline the New Relic Metrics exporter can also  be run independently enabling standalone mode. To run in Docker for instance run the following:
  
-docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.1
+docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.2
 
 ## Contributing
 

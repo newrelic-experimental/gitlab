@@ -13,7 +13,6 @@ from opentelemetry.sdk.resources import SERVICE_NAME
 import re
 from global_variables import *
 import requests
-import ast
 
 LoggingInstrumentor().instrument(set_logging_format=True)
 
@@ -41,10 +40,11 @@ def grab_data(project):
                                 get_dora_metrics(project)
                             except Exception as e:
                                 print("Unable to obtain DORA metrics",e)
-                        print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))
-                        if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                            #Send project information as log events with attributes
-                            project_logger.info("Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) + " data")
+                        # If we don't need to export all projects each time
+                        # if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                        #Send project information as log events with attributes
+                        project_logger.info("Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) + " data")
+                        print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))              
                     else:
                         print("No project name matched configured regex " + "\"" + str(GLAB_EXPORT_PROJECTS_REGEX)+ "\" in path " + "\""+str(path)+"\"")
         else:

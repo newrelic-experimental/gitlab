@@ -24,8 +24,8 @@ global paths
 global GLAB_EXPORT_LOGS
 global GLAB_DORA_METRICS
 
-GLAB_DORA_METRICS = False
-GLAB_EXPORT_LOGS = True
+GLAB_DORA_METRICS=False
+GLAB_EXPORT_LOGS=True
 GLAB_STANDALONE=False
 GLAB_EXPORT_LAST_MINUTES=61
 GLAB_PROJECT_OWNERSHIP=True
@@ -40,7 +40,7 @@ GLAB_EXPORT_PATHS = ""
 if "GLAB_DORA_METRICS" in os.environ and os.getenv('GLAB_DORA_METRICS').lower() == "true":
     GLAB_DORA_METRICS = os.getenv('GLAB_DORA_METRICS')
 else:
-    GLAB_EXPORT_LOGS = False
+    GLAB_DORA_METRICS=False
     
 # Check export logs is set
 if "GLAB_EXPORT_LOGS" in os.environ and os.getenv('GLAB_EXPORT_LOGS').lower() == "false":
