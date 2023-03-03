@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pytz
 import zulu
 from opentelemetry.sdk.resources import Resource
@@ -9,8 +9,10 @@ from custom_parsers import parse_attributes, parse_metrics_attributes
 from otel import get_logger, get_meter, create_resource_attributes
 from custom_parsers import parse_attributes
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.sdk.resources import SERVICE_NAME
 import re
 from global_variables import *
+import requests
 
 LoggingInstrumentor().instrument(set_logging_format=True)
 
@@ -33,10 +35,16 @@ def grab_data(project):
                 if str(project_json["namespace"]["full_path"]) == (str(path)):
                     if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
                         get_all_resources(project)
-                        print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))
-                        if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                            #Send project information as log events with attributes
-                            project_logger.info("Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) + " data")
+                        if GLAB_DORA_METRICS:
+                            try:
+                                get_dora_metrics(project)
+                            except Exception as e:
+                                print("Unable to obtain DORA metrics",e)
+                        # If we don't need to export all projects each time
+                        # if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                        #Send project information as log events with attributes
+                        project_logger.info("Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) + " data")
+                        print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))              
                     else:
                         print("No project name matched configured regex " + "\"" + str(GLAB_EXPORT_PROJECTS_REGEX)+ "\" in path " + "\""+str(path)+"\"")
         else:
@@ -45,7 +53,46 @@ def grab_data(project):
                  
     except Exception as e:
         print(e)
-        
+
+def get_dora_metrics(current_project):
+    GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
+    project_id = json.loads(current_project.to_json())["id"]
+    today = date.today()-timedelta(days=1)
+    deployment_frequency = str(GLAB_ENDPOINT)+"/api/v4/projects/"+str(project_id)+"/dora/metrics?metric=deployment_frequency&start_date="+str(today)
+    lead_time_for_changes = str(GLAB_ENDPOINT)+"/api/v4/projects/"+str(project_id)+"/dora/metrics?metric=lead_time_for_changes&start_date"+str(today)
+    time_to_restore_service = str(GLAB_ENDPOINT)+"/api/v4/projects/"+str(project_id)+"/dora/metrics?metric=time_to_restore_service&start_date"+str(today)
+    change_failure_rate = str(GLAB_ENDPOINT)+"/api/v4/projects/"+str(project_id)+"/dora/metrics?metric=change_failure_rate&start_date"+str(today)
+    metrics = {"deployment_frequency":deployment_frequency,"lead_time_for_changes":lead_time_for_changes,"time_to_restore_service":time_to_restore_service,"change_failure_rate":change_failure_rate}
+    req_headers = {
+    'PRIVATE-TOKEN': GLAB_TOKEN,
+    }
+    attributes_dora_metrics ={
+        SERVICE_NAME: GLAB_SERVICE_NAME,
+        "gitlab.source": "gitlab-metrics-exporter",
+        "gitlab.resource.type": "dora-metrics",
+        "project.id": project_id,
+        "namespace.path": json.loads(current_project.to_json())["namespace"]["path"],
+        "namespace.kind": json.loads(current_project.to_json())["namespace"]["kind"],
+        "url": json.loads(current_project.to_json())["web_url"]
+        }
+    dora_metrics_resource = Resource(attributes=attributes_dora_metrics)
+    meter = get_meter(endpoint, headers, dora_metrics_resource, str(project_id))
+    for metric in metrics:
+        r = requests.get(metrics[metric],headers=req_headers)
+        if r.status_code == 200 and len(r.text) > 2:
+            #Create metrics we want to populate
+            res = json.loads(r.text)
+            for i in range(len(res)):
+                if res[i]['value'] is not None:
+                    if metric == "change_failure_rate":
+                        meter.create_counter("gitlab_dora_"+str(metric)).add(res[i]['value']*100,attributes={"date":str(res[i]['date'])})
+                    else:
+                        meter.create_counter("gitlab_dora_"+str(metric)).add(res[i]['value'],attributes={"date":str(res[i]['date'])})
+                else:
+                    meter.create_counter("gitlab_dora_"+str(metric)).add(0,attributes={"date":str(res[i]['date'])})
+                
+                
+            
 def get_all_resources(current_project):
     #Collect environments information
     get_environments(current_project)
