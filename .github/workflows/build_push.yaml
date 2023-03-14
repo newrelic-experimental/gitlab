@@ -23,7 +23,7 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     - name: Build containers
-      run:  export VERSION=${{  github.ref_name }} && docker-compose build
+      run:  export VERSION=${{ github.ref_name }} && docker-compose build
 
     - name: Push containers
-      run: export VERSION=${{  github.ref_name }} && docker-compose push
+      run: export VERSION=${{ github.ref_name }} && docker-compose push
