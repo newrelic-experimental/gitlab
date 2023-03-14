@@ -30,7 +30,7 @@ def grab_data(project):
         project_resource = Resource(attributes=attributes)
         project_logger = get_logger(endpoint,headers,project_resource,"project_logger")
         # Check if we should export only data for specific groups/projects
-        if paths != "":
+        if paths:
             for path in paths:          
                 if str(project_json["namespace"]["full_path"]) == (str(path)):
                     if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
@@ -240,13 +240,15 @@ def get_pipelines(current_project):
             print("Metrics sent for pipeline: " + str(pipeline_id))
             print("Log events sent for pipeline: " + str(pipeline_id))
             #Collect job information
-            get_jobs(project_id,current_pipeline)
+            get_jobs(current_project,current_pipeline)
 
     except Exception as e:
         print(project_id,e)
         
-def get_jobs(project_id,current_pipeline):
+def get_jobs(current_project,current_pipeline):
     try:
+        project_id = json.loads(current_project.to_json())["id"]
+        GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
         jobs = current_pipeline.jobs.list(get_all=True)
         current_pipeline_json = json.loads(current_pipeline.to_json())
         #Collect job information

@@ -59,7 +59,7 @@ else:
     if "CI_PROJECT_NAMESPACE" in os.environ:
         GLAB_EXPORT_PATHS = os.getenv('CI_PROJECT_NAMESPACE')
 
-if len(GLAB_EXPORT_PATHS) != "":
+if GLAB_EXPORT_PATHS != "":
     paths = GLAB_EXPORT_PATHS.split(",")
 else:
     paths = ""
@@ -80,10 +80,11 @@ if "GLAB_PROJECT_OWNERSHIP" in os.environ:
 if "GLAB_PROJECT_VISIBILITY" in os.environ:
     GLAB_PROJECT_VISIBILITY = os.getenv('GLAB_PROJECT_VISIBILITY')
     
-# Check if we running as pipeline schedule or standalone mode
-if "GLAB_STANDALONE" in os.environ:
-    GLAB_STANDALONE = os.getenv('GLAB_STANDALONE')
-
+# Check if we running as pipeline schedule or standalone mode   
+if "GLAB_STANDALONE" in os.environ and os.getenv('GLAB_STANDALONE').lower() == "true":
+    GLAB_STANDALONE = True
+  
+    
 # Check if we using default amount data to export
 if "GLAB_EXPORT_LAST_MINUTES" in os.environ:
     GLAB_EXPORT_LAST_MINUTES = int(os.getenv('GLAB_EXPORT_LAST_MINUTES'))+1
