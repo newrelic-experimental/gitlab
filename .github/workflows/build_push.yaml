@@ -4,7 +4,8 @@ on:
   release:
   workflow_dispatch:
   push:
-    branches-ignore: main
+    tags:
+      - '*'
     
 jobs:
   login:
@@ -22,7 +23,7 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     - name: Build containers
-      run:  export VERSION=${GITHUB_REF#refs/tags/}  && docker-compose build
+      run:  export VERSION=${{  github.ref_name }} && docker-compose build
 
     - name: Push containers
-      run: export VERSION=${GITHUB_REF#refs/tags/} && docker-compose push
+      run: export VERSION=${{  github.ref_name }} && docker-compose push
