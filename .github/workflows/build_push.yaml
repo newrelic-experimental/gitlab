@@ -5,6 +5,8 @@ on:
   workflow_dispatch:
   push:
     branches-ignore: main
+    tags: [ v* ]
+
     
 jobs:
   login:
@@ -22,7 +24,15 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     - name: Build containers
-      run:  export VERSION=${GITHUB_REF#refs/heads/}  && docker-compose build
+      run:  export VERSION=${{ steps.meta.outputs.tags }} && docker-compose build
+      with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
 
     - name: Push containers
-      run: export VERSION=${GITHUB_REF#refs/heads/} && docker-compose push
+      run: export VERSION=${{ steps.meta.outputs.tags }} && docker-compose push
+      with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
