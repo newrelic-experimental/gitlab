@@ -73,10 +73,11 @@ else:
     GLAB_ENDPOINT="https://gitlab.com/"
     gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
 
-# Check project ownership and visibility
-if "GLAB_PROJECT_OWNERSHIP" in os.environ:
-    GLAB_PROJECT_OWNERSHIP = os.getenv('GLAB_PROJECT_OWNERSHIP')
-    
+# Check project ownership and visibility     
+if "GLAB_PROJECT_OWNERSHIP" in os.environ and os.getenv('GLAB_PROJECT_OWNERSHIP').lower() == "false":
+    GLAB_PROJECT_OWNERSHIP = False  
+   
+        
 if "GLAB_PROJECT_VISIBILITY" in os.environ:
     GLAB_PROJECT_VISIBILITY = os.getenv('GLAB_PROJECT_VISIBILITY')
     

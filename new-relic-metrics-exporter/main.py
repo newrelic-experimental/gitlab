@@ -5,14 +5,15 @@ from global_variables import *
   
 def send_to_nr():
     projects = gl.projects.list(owned=GLAB_PROJECT_OWNERSHIP,visibility=GLAB_PROJECT_VISIBILITY,get_all=True)
-    try:
-        for project in projects:
-            grab_data(project)
-    except Exception as e:
-        print(e)
+    print("Found total of " + str(len(projects)) + " projects using -> OWNED: " + str(GLAB_PROJECT_OWNERSHIP) + " and VISIBILITY: " + str(GLAB_PROJECT_VISIBILITY) + ". \nChecking which ones match provided paths and project regex configuration")  
+    for project in projects:
+        grab_data(project)
         
     time.sleep(1)
-    print('Exporter finished!!!')
+    if len(projects) == 0:
+        print("Nothing to export check your configuration!!!")
+    else:
+        print('Exporter finished!!!')
     gl.session.close()
     
 if GLAB_STANDALONE:

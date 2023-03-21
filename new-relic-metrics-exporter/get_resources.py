@@ -34,12 +34,16 @@ def grab_data(project):
             for path in paths:          
                 if str(project_json["namespace"]["full_path"]) == (str(path)):
                     if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
-                        get_all_resources(project)
+                        try:
+                            print("Project: "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "") + " matched configuration, collecting data...")
+                            get_all_resources(project)
+                        except Exception as e:
+                            print(e + " -> Failed to collect data for project:  "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")+" check your configuration.")
                         if GLAB_DORA_METRICS:
                             try:
                                 get_dora_metrics(project)
                             except Exception as e:
-                                print("Unable to obtain DORA metrics",e)
+                                print("Unable to obtain DORA metrics ",e)
                         # If we don't need to export all projects each time
                         # if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
                         #Send project information as log events with attributes
@@ -48,11 +52,11 @@ def grab_data(project):
                     else:
                         print("No project name matched configured regex " + "\"" + str(GLAB_EXPORT_PROJECTS_REGEX)+ "\" in path " + "\""+str(path)+"\"")
         else:
-            print("GLAB_EXPORT_PATH not configured")
+            print("GLAB_EXPORT_PATHS not configured")
             exit(1)  
                  
     except Exception as e:
-        print(e)
+        print(e + " -> ERROR obtaining data for project:  "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", ""))
 
 def get_dora_metrics(current_project):
     GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
@@ -124,7 +128,7 @@ def get_environments (current_project):
                 environment_logger = get_logger(endpoint,headers,environment_resource,"environment_logger")
                 #Send environment data as log events with attributes                  
                 environment_logger.info("Environment: "+ str(environment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) + " data")
-                print("Log events sent for environment: " + str(environment_json['id'])+ " from project: " + str(project_id))
+                print("Log events sent for environment: " + str(environment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
             
     except Exception as e:
         print(project_id,e)
@@ -148,7 +152,7 @@ def get_deployments (current_project):
                 deployment_logger = get_logger(endpoint,headers,deployment_resource,"deployment_logger")
                 #Send deployment data as log events with attributes
                 deployment_logger.info("Deployment: "+ str(deployment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) + " data")
-                print("Log events sent for deployment: " + str(deployment_json['id'])+ " from project: " + str(project_id))           
+                print("Log events sent for deployment: " + str(deployment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))           
                 
     except Exception as e:
         print(project_id,e)
@@ -175,7 +179,7 @@ def get_releases(current_project):
                     release_logger = get_logger(endpoint,headers,release_resource,"release_logger")
                     #Send releases data as log events with attributes
                     release_logger.info("Release: "+ str(release_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) + " data")
-                    print("Log events sent for release: " + str(release_json['id'])+ " from project: " + str(project_id))
+                    print("Log events sent for release: " + str(release_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
             
     except Exception as e:
         print(project_id,e)
@@ -237,8 +241,8 @@ def get_pipelines(current_project):
             pipeline_logger = get_logger(endpoint,headers,pipeline_resource,"pipeline_logger")
             #Send pipeline data as log events with attributes
             pipeline_logger.info("Pipeline: "+ str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) + " data")
-            print("Metrics sent for pipeline: " + str(pipeline_id))
-            print("Log events sent for pipeline: " + str(pipeline_id))
+            print("Metrics sent for pipeline: " + str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
+            print("Log events sent for pipeline: " + str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
             #Collect job information
             get_jobs(current_project,current_pipeline)
 
@@ -280,8 +284,8 @@ def get_jobs(current_project,current_pipeline):
                 job_logger = get_logger(endpoint,headers,job_resource,"job_logger")
                 #Send job data as log events with attributes
                 job_logger.info("Job: "+ str(job_json['id']) + " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) + " data")
-                print("Metrics sent for job: " + str(job_json['id'])+ " from project: " + str(project_id))
-                print("Log events sent for job: " + str(job_json['id']) + " for pipeline: "+ str(current_pipeline_json['id'])+ " from project: " + str(project_id))          
+                print("Metrics sent for job: " + str(job_json['id'])+ " for pipeline: "+ str(current_pipeline_json['id'])+ " from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
+                print("Log events sent for job: " + str(job_json['id']) + " for pipeline: "+ str(current_pipeline_json['id'])+ " from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))          
 
     except Exception as e:
         print(project_id,e)           
