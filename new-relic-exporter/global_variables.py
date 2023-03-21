@@ -44,7 +44,7 @@ else:
     
 # Check export logs is set
 if "GLAB_EXPORT_LOGS" in os.environ and os.getenv('GLAB_EXPORT_LOGS').lower() == "false":
-    GLAB_EXPORT_LOGS = os.getenv('GLAB_EXPORT_LOGS')
+    GLAB_EXPORT_LOGS = False
 else:
     GLAB_EXPORT_LOGS = True
         
