@@ -83,19 +83,18 @@ def get_dora_metrics(current_project):
     meter = get_meter(endpoint, headers, dora_metrics_resource, str(project_id))
     for metric in metrics:
         r = requests.get(metrics[metric],headers=req_headers)
+        dora=meter.create_counter("gitlab_dora_"+str(metric))
         if r.status_code == 200 and len(r.text) > 2:
             #Create metrics we want to populate
             res = json.loads(r.text)
             for i in range(len(res)):
                 if res[i]['value'] is not None:
                     if metric == "change_failure_rate":
-                        meter.create_counter("gitlab_dora_"+str(metric)).add(res[i]['value']*100,attributes={"date":str(res[i]['date'])})
+                        dora.add(res[i]['value']*100,attributes={"date":str(res[i]['date'])})
                     else:
-                        meter.create_counter("gitlab_dora_"+str(metric)).add(res[i]['value'],attributes={"date":str(res[i]['date'])})
+                        dora.add(res[i]['value'],attributes={"date":str(res[i]['date'])})
                 else:
-                    meter.create_counter("gitlab_dora_"+str(metric)).add(0,attributes={"date":str(res[i]['date'])})
-                
-                
+                    dora.add(0,attributes={"date":str(res[i]['date'])})              
             
 def get_all_resources(current_project):
     #Collect environments information
