@@ -8,6 +8,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.trace import Status, StatusCode
 from otel import create_resource_attributes, get_logger, get_tracer
 from global_variables import *
+import re
     
 def send_to_nr():
     # Set local variables
@@ -100,15 +101,15 @@ def send_to_nr():
                     child = job_tracer.start_span(name="Stage: " + str(job['name'])+" - job_id: "+ str(job['id']), start_time=do_time(job['started_at']),context=pcontext, kind=trace.SpanKind.CONSUMER)
                     with trace.use_span(child, end_on_exit=False):
                         try:
+                            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
                             if job['status'] == "failed":
                                 current_job = project.jobs.get(job['id'], lazy=True)
                                 with open("job.log", "wb") as f:
                                     current_job.trace(streamed=True, action=f.write)
-
                                 with open("job.log", "rb") as f:
                                     log_data = ""
                                     for string in f:
-                                        log_data+=str(string.decode('utf-8', 'ignore'))
+                                        log_data+=str(ansi_escape.sub('', str(string.decode('utf-8', 'ignore'))))
                                 
                                 match = log_data.split("ERROR: Job failed: ")
                                 if do_parse(match):
@@ -139,15 +140,16 @@ def send_to_nr():
                                         if err:
                                             count = 1
                                             for string in f:
-                                                if string.decode('utf-8') != "\n":
+                                                txt = str(ansi_escape.sub(' ', str(string.decode('utf-8', 'ignore'))))
+                                                if string.decode('utf-8') != "\n" and len(txt) > 2:
                                                     if count == 1:
-                                                        resource_attributes["message"] = string.decode('utf-8')
+                                                        resource_attributes["message"] = txt
                                                         resource_attributes.update(resource_attributes_base)
                                                         resource_log = Resource(attributes=resource_attributes)
                                                         job_logger = get_logger(endpoint,headers,resource_log, "job_logger")
                                                         job_logger.error("")
                                                     else:
-                                                        resource_attributes_base["message"] = string.decode('utf-8')
+                                                        resource_attributes_base["message"] = txt
                                                         resource_log = Resource(attributes=resource_attributes_base)
                                                         job_logger = get_logger(endpoint,headers,resource_log, "job_logger")
                                                         job_logger.error("")
@@ -155,19 +157,19 @@ def send_to_nr():
                                         else: 
                                             count = 1
                                             for string in f:
-                                                if count == 1:
-                                                    if string.decode('utf-8') != "\n":
-                                                        resource_attributes["message"] = string.decode('utf-8')
+                                                txt = str(ansi_escape.sub(' ', str(string.decode('utf-8', 'ignore'))))
+                                                if string.decode('utf-8') != "\n" and len(txt) > 2:
+                                                    if count == 1:
+                                                        resource_attributes["message"] = txt
                                                         resource_log = Resource(attributes=resource_attributes)
                                                         job_logger = get_logger(endpoint,headers,resource_log, "job_logger")
                                                         job_logger.info("")
-                                                else:
-                                                    if string.decode('utf-8') != "\n":
-                                                        resource_attributes_base["message"] = string.decode('utf-8')
+                                                    else:
+                                                        resource_attributes_base["message"] = txt
                                                         resource_log = Resource(attributes=resource_attributes_base)
                                                         job_logger = get_logger(endpoint,headers,resource_log, "job_logger")
                                                         job_logger.info("")
-                                                count += 1
+                                                    count += 1
 
                                 except Exception as e:
                                     print(e)
