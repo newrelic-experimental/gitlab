@@ -132,7 +132,7 @@ def send_to_nr():
                                     with open("job.log", "rb") as f:  
                                         err = False
                                         for string in f:
-                                            if string.decode('utf-8').__contains__('ERROR'):
+                                            if string.decode('utf-8').startswith('ERROR:'):
                                                 err = True
                                                 
                                     with open("job.log", "rb") as f:
