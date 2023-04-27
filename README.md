@@ -40,6 +40,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you‚Ä
 | `GLAB_EXPORT_LOGS` | Export job logs to New Relic | True | Boolean | True |
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_LOW_DATA_MODE` | export only bear minimum data (only recommended during testing) | True | Boolean | False |
+| `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 
 # New Relic Metrics Exporter
 | Variables | Description | Optional | Values | Default |
@@ -53,6 +54,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you‚Ä
 | `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | True | Bool | False |
 | `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against ‚Äú.*‚Äù for all | False | Boolean | None |
+| `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
 | `GLAB_ATTRIBUTES_DROP` | Attributes to drop from logs and spans events | True | List* | None |
 | `GLAB_DIMENSION_METRICS` | Extra dimensional metric attributes to add to each metric | True | List* | NONE Note the following attributes will always be set as dimensions regardless of this setting: status,stage,name |
