@@ -6,3 +6,4 @@ opentelemetry.instrumentation.logging
 pyrfc3339
 zulu
 schedule
+regex

@@ -15,7 +15,7 @@ from global_variables import *
 import requests
 import logging
 
-LoggingInstrumentor().instrument(set_logging_format=True,log_level=logging.DEBUG)
+LoggingInstrumentor().instrument(set_logging_format=True,log_level=logging.INFO)
 
 def grab_data(project):
     try:

@@ -1,7 +1,16 @@
 import time
 from pyrfc3339 import parse
 import os
+from re import search
 
+GLAB_CONVERT_TO_TIMESTAMP = False
+
+# Check export logs is set
+if "GLAB_CONVERT_TO_TIMESTAMP" in os.environ and os.getenv('GLAB_CONVERT_TO_TIMESTAMP').lower() == "true":
+    GLAB_CONVERT_TO_TIMESTAMP = True
+else:
+    GLAB_CONVERT_TO_TIMESTAMP = False
+    
 def do_time(string):
     return (int(round(time.mktime(parse(string).timetuple())) * 1000000000))
 
@@ -81,7 +90,17 @@ def parse_attributes(obj):
                                 for att in obj[attribute][sub_att]:
                                     attribute_name = do_string(attribute)+"."+do_string(sub_att)+"."+do_string(att)
                                     if attribute_name not in attributes_to_drop:
-                                        obj_atts[attribute_name]=str(obj[attribute][sub_att][att])
+                                        if GLAB_CONVERT_TO_TIMESTAMP:
+                                            if search('_at|_date',attribute_name):
+                                                if do_parse(str(obj[attribute][sub_att][att])):
+                                                    obj_atts[attribute_name]=do_time(str(obj[attribute][sub_att][att]))
+                                                else:
+                                                    obj_atts[attribute_name]=str(obj[attribute][sub_att][att])
+                                            else:
+                                                obj_atts[attribute_name]=str(obj[attribute][sub_att][att])
+                                        else:
+                                            obj_atts[attribute_name]=str(obj[attribute][sub_att][att])
+
 
                             elif type(obj[attribute][sub_att]) is list:
                                 for key in obj[attribute][sub_att]:
@@ -90,15 +109,43 @@ def parse_attributes(obj):
                                             if do_parse(key[att]):
                                                 attribute_name = do_string(attribute)+"."+do_string(sub_att)+"."+do_string(att)
                                                 if attribute_name not in attributes_to_drop:
-                                                    obj_atts[attribute_name]=str(key[att])
+                                                    if GLAB_CONVERT_TO_TIMESTAMP:
+                                                        if search('_at|_date',attribute_name):
+                                                            if do_parse(str(key[att])):
+                                                                obj_atts[attribute_name]=do_time(str(key[att]))
+                                                            else:
+                                                                obj_atts[attribute_name]=str(key[att])
+                                                        else:
+                                                            obj_atts[attribute_name]=str(key[att])
+                                                    else:
+                                                        obj_atts[attribute_name]=str(key[att])
+                                                    
                                     else:
                                         attribute_name = do_string(attribute)+"."+do_string(sub_att)
                                         if attribute_name not in attributes_to_drop:
-                                            obj_atts[attribute_name]=str(key)
+                                            if GLAB_CONVERT_TO_TIMESTAMP:
+                                                if search('_at|_date',attribute_name):
+                                                    if do_parse(str(key)):
+                                                        obj_atts[attribute_name]=do_time(str(key))
+                                                    else:
+                                                        obj_atts[attribute_name]=str(key)
+                                                else:
+                                                    obj_atts[attribute_name]=str(key)
+                                            else:         
+                                                obj_atts[attribute_name]=str(key)
                             else:
                                 attribute_name = do_string(attribute)+"."+do_string(sub_att)
                                 if attribute_name not in attributes_to_drop:
-                                    obj_atts[attribute_name]=str(obj[attribute][sub_att])
+                                    if GLAB_CONVERT_TO_TIMESTAMP:
+                                        if search('_at|_date',attribute_name):
+                                            if do_parse(str(obj[attribute][sub_att])):
+                                                obj_atts[attribute_name]=do_time(str(obj[attribute][sub_att]))
+                                            else:
+                                                obj_atts[attribute_name]=str(obj[attribute][sub_att])
+                                        else:
+                                            obj_atts[attribute_name]=str(obj[attribute][sub_att])
+                                    else:
+                                        obj_atts[attribute_name]=str(obj[attribute][sub_att])
 
                 elif type(obj[attribute]) is list:
                     for key in obj[attribute]:
@@ -107,12 +154,30 @@ def parse_attributes(obj):
                                 if do_parse(key[att]):
                                     attribute_name = do_string(attribute)+"."+do_string(att)
                                     if attribute_name not in attributes_to_drop:
-                                        obj_atts[attribute_name]=str(key[att])
+                                        if GLAB_CONVERT_TO_TIMESTAMP:
+                                            if search('_at|_date',attribute_name):
+                                                if do_parse(str(key[att])):
+                                                    obj_atts[attribute_name]=do_time(str(key[att]))
+                                                else:
+                                                    obj_atts[attribute_name]=str(key[att])
+                                            else:
+                                                obj_atts[attribute_name]=str(key[att])
+                                        else:
+                                            obj_atts[attribute_name]=str(key[att])
                 else:
                     if do_parse(obj[attribute]):
                         attribute_name = do_string(attribute)
                         if attribute_name not in attributes_to_drop:
-                            obj_atts[attribute_name]=str(obj[attribute])
+                            if GLAB_CONVERT_TO_TIMESTAMP:
+                                if search('_at|_date',attribute_name):
+                                    if do_parse(str(obj[attribute])):
+                                        obj_atts[attribute_name]=do_time(str(obj[attribute]))
+                                    else:
+                                        obj_atts[attribute_name]=str(obj[attribute])
+                                else:
+                                    obj_atts[attribute_name]=str(obj[attribute])
+                            else:
+                                obj_atts[attribute_name]=str(obj[attribute])
     return obj_atts
 
 def parse_metrics_attributes(attributes):

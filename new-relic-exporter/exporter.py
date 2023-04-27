@@ -45,7 +45,7 @@ def send_to_nr():
     "gitlab.resource.type": "span"
     })
     
-    LoggingInstrumentor().instrument(set_logging_format=True,log_level=logging.DEBUG)
+    LoggingInstrumentor().instrument(set_logging_format=True,log_level=logging.INFO)
     
     #Create global tracer to export traces to NR
     tracer = get_tracer(endpoint, headers, global_resource, "tracer")

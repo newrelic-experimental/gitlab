@@ -47,7 +47,7 @@ if "GLAB_EXPORT_LOGS" in os.environ and os.getenv('GLAB_EXPORT_LOGS').lower() ==
     GLAB_EXPORT_LOGS = False
 else:
     GLAB_EXPORT_LOGS = True
-        
+           
 # Check if project name regex is set
 if "GLAB_EXPORT_PROJECTS_REGEX" in os.environ:
     GLAB_EXPORT_PROJECTS_REGEX = os.getenv('GLAB_EXPORT_PROJECTS_REGEX')
