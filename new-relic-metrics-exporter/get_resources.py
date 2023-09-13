@@ -23,6 +23,7 @@ def grab_data(project):
         GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
         project_json = json.loads(project.to_json())
         attributes_p ={
+        "instrumentation.name": "gitlab-integration",
         "gitlab.source": "gitlab-metrics-exporter",
         "gitlab.resource.type": "project"
         }
@@ -73,6 +74,7 @@ def get_dora_metrics(current_project):
     }
     attributes_dora_metrics ={
         SERVICE_NAME: GLAB_SERVICE_NAME,
+        "instrumentation.name": "gitlab-integration",
         "gitlab.source": "gitlab-metrics-exporter",
         "gitlab.resource.type": "dora-metrics",
         "project.id": project_id,
@@ -118,6 +120,7 @@ def get_environments (current_project):
             for environment in environments:
                 environment_json = json.loads(environment.to_json())
                 attributes_e ={
+                "instrumentation.name": "gitlab-integration",
                 "gitlab.source": "gitlab-metrics-exporter",
                 "gitlab.resource.type": "environment"
                 }
@@ -142,6 +145,7 @@ def get_deployments (current_project):
             for deployment in deployments:
                 deployment_json = json.loads(deployment.to_json())
                 attributes_d ={
+                "instrumentation.name": "gitlab-integration",
                 "gitlab.source": "gitlab-metrics-exporter",
                 "gitlab.resource.type": "deployment"
                 }
@@ -168,6 +172,7 @@ def get_releases(current_project):
                 release_json = json.loads(release.to_json())
                 if zulu.parse(release_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
                     attributes_r ={
+                    "instrumentation.name": "gitlab-integration",
                     "gitlab.source": "gitlab-metrics-exporter",
                     "gitlab.resource.type": "release"
                     }
@@ -187,12 +192,14 @@ def get_releases(current_project):
 def get_runners(current_project):
     try:
         project_id = json.loads(current_project.to_json())["id"]
-        runners = current_project.runners.list(get_all=True)
+        runners = gl.runners_all.list()
+        # runners = current_project.runners.list()
         GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
         for runner in runners:
             runner_json = json.loads(runner.to_json())
             if str(runner_json ["is_shared"]).lower() == "false":
                 attributes_run = {
+                "instrumentation.name": "gitlab-integration",
                 "gitlab.source": "gitlab-metrics-exporter",
                 "gitlab.resource.type": "runner"
                 }
@@ -220,6 +227,7 @@ def get_pipelines(current_project):
             #Grab pipeline attributes
             current_pipeline_attributes = create_resource_attributes(parse_attributes(current_pipeline_json),GLAB_SERVICE_NAME)
             attributes_pip = {
+            "instrumentation.name": "gitlab-integration",
             "gitlab.source": "gitlab-metrics-exporter",
             "gitlab.resource.type": "pipeline"
             }
@@ -263,6 +271,7 @@ def get_jobs(current_project,current_pipeline):
                 #Grab job attributes
                 current_job_attributes = create_resource_attributes(parse_attributes(job_json),GLAB_SERVICE_NAME)
                 attributes_j = {
+                "instrumentation.name": "gitlab-integration",
                 "gitlab.source": "gitlab-metrics-exporter",
                 "gitlab.resource.type": "job"
                 }
