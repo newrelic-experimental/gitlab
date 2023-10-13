@@ -1,14 +1,19 @@
 import schedule
 import time
-from get_resources import grab_data
+from get_resources import grab_data,get_runners
 from global_variables import *
-  
+import concurrent.futures
+
+
+        
 def send_to_nr():
     projects = gl.projects.list(owned=GLAB_PROJECT_OWNERSHIP,visibility=GLAB_PROJECT_VISIBILITY,get_all=True)
     print("Found total of " + str(len(projects)) + " projects using -> OWNED: " + str(GLAB_PROJECT_OWNERSHIP) + " and VISIBILITY: " + str(GLAB_PROJECT_VISIBILITY) + ". \nChecking which ones match provided paths and project regex configuration")  
-    for project in projects:
-        grab_data(project)
-        
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        executor.map(grab_data,projects)
+    
+    get_runners()
     time.sleep(1)
     if len(projects) == 0:
         print("Nothing to export check your configuration!!!")
