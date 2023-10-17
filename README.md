@@ -64,6 +64,17 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 
 > Gitlab runner with docker executor is required to run the exporters
 
+If using Kubernetes executors, use the below configuration
+
+'''
+image:
+    name: docker.io/dpacheconr/gitlab-metrics-exporter:1.0.7
+    entrypoint: [""]
+  script:
+    - python3 -u /app/main.py
+    - echo "Done"
+'''
+
 ## New Relic Quickstart
 > https://newrelic.com/instant-observability/gitlab
 
