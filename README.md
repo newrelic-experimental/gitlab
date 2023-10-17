@@ -85,7 +85,7 @@ image:
 Alternative to running new relic metrics exporter as pipeline schedule:
 Rather than running in a GitLab pipeline the New Relic Metrics exporter can also  be run independently enabling standalone mode. To run in Docker for instance run the following:
  
-docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.6
+docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.7
 
 ## Contributing
 
@@ -102,5 +102,3 @@ If you believe you have found a security vulnerability in this project or any of
 Gitlab Exporters are licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
 
 >Gitlab Exporters also use source code from third-party libraries. You can find full details on which libraries are used and the terms under which they are licensed in the third-party notices document.
-
-
