@@ -68,7 +68,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-metrics-exporter:1.0.7
+    name: docker.io/dpacheconr/gitlab-metrics-exporter:1.0.8
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
