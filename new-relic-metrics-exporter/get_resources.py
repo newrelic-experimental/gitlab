@@ -13,7 +13,10 @@ import re
 from global_variables import *
 import requests
 import logging
+import asyncio
+import time
 import concurrent.futures
+from concurrent.futures import wait
 
 LoggingInstrumentor().instrument(set_logging_format=True,log_level=logging.INFO)
 
@@ -48,14 +51,13 @@ def get_runners():
                     runner_attributes = create_resource_attributes(parse_attributes(runner_json),GLAB_SERVICE_NAME)                
                     runner_attributes.update({"gitlab.resource.type": "runner"})
                     #Send runner data as log events with attributes
-                    msg = "Runner: "+ str(runner_json['id'])+ str(GLAB_SERVICE_NAME) 
+                    msg = "Runner: "+ str(runner_json['id'])
                     global_logger._log(level=logging.INFO,msg=msg,extra=runner_attributes,args="")
-                    print("Log events sent for runner: " + str(runner_json['id'])+ " - " + str(GLAB_SERVICE_NAME))
-                    
+                    print("Log events sent for runner: " + str(runner_json['id']))
     except Exception as e:
         print("Unable to obtain runners due to ",str(e))
         
-def grab_data(project):
+async def grab_data(project):
     try:
         #Collect project information
         GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
@@ -67,22 +69,40 @@ def grab_data(project):
                     if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
                         try:
                             print("Project: "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "") + " matched configuration, collecting data...")
-                            get_all_resources(project)
+                            project_id = json.loads(project.to_json())["id"]
+                            GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
+                            await asyncio.gather(get_pipelines(project,project_id,GLAB_SERVICE_NAME))
+
+                            if q.qsize() != 0:
+                                while q.qsize() > 0:
+                                    data = q.get()
+                                    if data[3] == "deployment":
+                                        parse_deployment(data)
+                                    elif data[3] == "environment":
+                                        parse_environment(data)
+                                    elif data[3] == "release":
+                                        parse_release(data)
+                                    elif data[3] == "pipeline":
+                                        parse_pipeline(data)
+                                    elif data[3] == "job":
+                                        parse_job(data)
+                                    # To bypass issues with overloading global logger with too much data
+                                    time.sleep(0.05)
                         except Exception as e:
-                            print(str(e) + " -> Failed to collect data for project:  "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")+" check your configuration.")
+                            print(str(e) + " -> Failed to collect data for project:  "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")+" check your configuration.",project_json)
                         if GLAB_DORA_METRICS:
                             try:
                                 get_dora_metrics(project)
                             except Exception as e:
                                 print("Unable to obtain DORA metrics ",e)
                         # If we don't need to export all projects each time
-                        # if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                        #Send project information as log events with attributes
-                        c_attributes = create_resource_attributes(parse_attributes(project_json), GLAB_SERVICE_NAME)
-                        c_attributes.update({"gitlab.resource.type": "project"})
-                        msg = "Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) 
-                        global_logger._log(level=logging.INFO,msg=msg,extra=c_attributes,args="")
-                        print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))              
+                        if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                            #Send project information as log events with attributes
+                            c_attributes = create_resource_attributes(parse_attributes(project_json), GLAB_SERVICE_NAME)
+                            c_attributes.update({"gitlab.resource.type": "project"})
+                            msg = "Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) 
+                            global_logger._log(level=logging.INFO,msg=msg,extra=c_attributes,args="")
+                            print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))              
                     else:
                         print("No project name matched configured regex " + "\"" + str(GLAB_EXPORT_PROJECTS_REGEX)+ "\" in path " + "\""+str(path)+"\"")
         else:
@@ -130,130 +150,158 @@ def get_dora_metrics(current_project):
                         dora.add(res[i]['value'],attributes={"date":str(res[i]['date'])})
                 else:
                     dora.add(0,attributes={"date":str(res[i]['date'])})              
-            
-def get_all_resources(current_project):
-    project_id = json.loads(current_project.to_json())["id"]
-    GLAB_SERVICE_NAME = str((current_project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        # executor.submit(get_deployments, current_project,project_id,GLAB_SERVICE_NAME)
-        # executor.submit(get_environments, current_project,project_id,GLAB_SERVICE_NAME)
-        # executor.submit(get_releases, current_project,project_id,GLAB_SERVICE_NAME)
-        executor.submit(get_pipelines, current_project,project_id,GLAB_SERVICE_NAME)
 
-def get_deployments(current_project,project_id,GLAB_SERVICE_NAME):
+def parse_deployment(data):
+    deployment_json = data[0]
+    project_id = data[1]
+    GLAB_SERVICE_NAME = data[2]
+    try:
+        deployment_attributes = create_resource_attributes(parse_attributes(deployment_json), GLAB_SERVICE_NAME)
+        deployment_attributes.update({"gitlab.resource.type": "deployment"})
+        #Send deployment data as log events with attributes
+        msg = "Deployment: "+ str(deployment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) 
+        global_logger._log(level=logging.INFO,msg=msg,extra=deployment_attributes,args="")   
+        print("Log events sent for deployment: " + str(deployment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
+    except Exception as e:
+            print("Failed to obtain deployments for project",project_id," due to error ", e)
+     
+async def get_deployments(current_project,project_id,GLAB_SERVICE_NAME):
+    global q
     deployments = current_project.deployments.list(get_all=True, order_by="created_at", sort="desc")
     if len(deployments) > 0: # check if there are deployments in this project
         for deployment in deployments:
             deployment_json = json.loads(deployment.to_json())
             if zulu.parse(deployment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                try:
-                    deployment = current_project.deployments.get(deployment_json['id'])
-                    deployment_attributes = create_resource_attributes(parse_attributes(deployment_json), GLAB_SERVICE_NAME)
-                    deployment_attributes.update({"gitlab.resource.type": "deployment"})
-                    #Send deployment data as log events with attributes
-                    msg = "Deployment: "+ str(deployment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) 
-                    global_logger._log(level=logging.INFO,msg=msg,extra=deployment_attributes,args="")   
-                    print("Log events sent for deployment: " + str(deployment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
-                except Exception as e:
-                    print("Failed to obtain deployments for project",project_id," due to error ", e)
+                q.put([deployment_json,project_id,GLAB_SERVICE_NAME,"deployment"])
             else:
                 break
 
-def get_environments (current_project,project_id,GLAB_SERVICE_NAME):
+def parse_environment(data):
+    environment_json = data[0]
+    project_id = data[1]
+    GLAB_SERVICE_NAME = data[2]
+    try:
+        environment_attributes = create_resource_attributes(parse_attributes(environment_json),GLAB_SERVICE_NAME)
+        environment_attributes.update({"gitlab.resource.type": "environment"})
+        #Send environment data as log events with attributes   
+        msg = "Environment: "+ str(environment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) 
+        global_logger._log(level=logging.INFO,msg=msg,extra=environment_attributes,args="")          
+        print("Log events sent for environment: " + str(environment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
+    except Exception as e:
+        print("Failed to obtain environments for project",project_id," due to error ", e)
+                    
+async def get_environments(current_project,project_id,GLAB_SERVICE_NAME):
+    global q
     environments = current_project.environments.list(get_all=True)
     if len(environments) > 0: # check if there are environments in this project
         for environment in environments:        
             environment_json = json.loads(environment.to_json())
             if zulu.parse(environment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                try:
-                    environment = current_project.environments.get(environment_json['id'])
-                    environment_attributes = create_resource_attributes(parse_attributes(environment_json),GLAB_SERVICE_NAME)
-                    environment_attributes.update({"gitlab.resource.type": "environment"})
-                    #Send environment data as log events with attributes   
-                    msg = "Environment: "+ str(environment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) 
-                    global_logger._log(level=logging.INFO,msg=msg,extra=environment_attributes,args="")          
-                    print("Log events sent for environment: " + str(environment_json['id'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
-    
-                except Exception as e:
-                    print("Failed to obtain environments for project",project_id," due to error ", e)
-        
-def get_releases(current_project,project_id,GLAB_SERVICE_NAME):
+                q.put([environment_json,project_id,GLAB_SERVICE_NAME,"environment"])
+
+def parse_release(data):
+    release_json = data[0]
+    project_id = data[1]
+    GLAB_SERVICE_NAME = data[2]
+    try:
+        release_attributes = create_resource_attributes(parse_attributes(release_json),GLAB_SERVICE_NAME)
+        release_attributes.update({"gitlab.resource.type": "release"})
+        #Send releases data as log events with attributes
+        msg = "Release: "+ str(release_json['tag_name'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) 
+        global_logger._log(level=logging.INFO,msg=msg,extra=release_attributes,args="")      
+        print("Log events sent for release: " + str(release_json['tag_name'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
+    except Exception as e:
+        print("Failed to obtain environments for project",project_id," due to error ", e)
+           
+async def get_releases(current_project,project_id,GLAB_SERVICE_NAME):
+    global q
     releases = current_project.releases.list(get_all=True, order_by="created_at", sort="desc")
     if len(releases) > 0: # check if there are releases in this project
         for release in releases:
             release_json = json.loads(release.to_json())
             if zulu.parse(release_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                try:
-                    release = current_project.releases.get(release_json['tag_name'])
-                    release_attributes = create_resource_attributes(parse_attributes(release_json),GLAB_SERVICE_NAME)
-                    release_attributes.update({"gitlab.resource.type": "release"})
-                    #Send releases data as log events with attributes
-                    msg = "Release: "+ str(release_json['tag_name'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME) 
-                    global_logger._log(level=logging.INFO,msg=msg,extra=release_attributes,args="")      
-                    print("Log events sent for release: " + str(release_json['tag_name'])+ " from project: " + str(project_id) + " - " + str(GLAB_SERVICE_NAME))
-                except Exception as e:
-                    print("Failed to obtain releases for project",project_id," due to error ", e)
+                q.put([release_json,project_id,GLAB_SERVICE_NAME,"release"])
             else:
                 break
-            
-def get_pipelines(current_project,project_id,GLAB_SERVICE_NAME):
-    print("Gathering pipeline data for project " + str(project_id) + " this may take while...")
-    pipelines = current_project.pipelines.list(get_all=True, updated_after=str((datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)))))
-    print("Found",len(pipelines),"pipelines")
-    if len(pipelines)> 0: # check if there are pipelines in this project
-        try:
-            for pipeline in pipelines:
-                pipeline_json = json.loads(pipeline.to_json())
-                pipeline_id = pipeline_json['id']
-                current_pipeline = current_project.pipelines.get(pipeline_id)
-                current_pipeline_json = json.loads(current_pipeline.to_json())
-                attributes_pip = {"gitlab.resource.type": "pipeline"}
-                # # Grab pipeline attributes
-                current_pipeline_attributes = create_resource_attributes(parse_attributes(current_pipeline_json),GLAB_SERVICE_NAME)      
-                # Check wich dimension to set on each metric
-                currrent_pipeline_metrics_attributes = parse_metrics_attributes(current_pipeline_attributes)
-                currrent_pipeline_metrics_attributes[2].update(attributes_pip)
-                # Update attributes for the log events
-                current_pipeline_attributes.update(attributes_pip)
-                # Send pipeline metrics with configured dimensions
-                gitlab_pipelines_duration.add(currrent_pipeline_metrics_attributes[0],currrent_pipeline_metrics_attributes[2])
-                gitlab_pipelines_queued_duration.add(currrent_pipeline_metrics_attributes[1],currrent_pipeline_metrics_attributes[2])
-                # Send pipeline data as log events with attributes
-                msg = "Pipeline: "+ str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) 
-                global_logger._log(level=logging.INFO,msg=msg,extra=current_pipeline_attributes,args="")   
-                print("Metrics sent for pipeline: " + str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
-                print("Log events sent for pipeline: " + str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
-                #Collect job information
-                get_jobs(current_pipeline,project_id,GLAB_SERVICE_NAME)
-        except Exception as e:
-            print("Failed to obtain pipelines for project",project_id," due to error ", e)
 
-        
-def get_jobs(current_pipeline,project_id,GLAB_SERVICE_NAME):
+def parse_pipeline(data):
+    pipeline_json=json.loads(data[0].to_json())
+    project_id = data[1]
+    GLAB_SERVICE_NAME = data[2]
+    pipeline_id = pipeline_json['id']
     try:
-        jobs = current_pipeline.jobs.list(get_all=True)
-        current_pipeline_json = json.loads(current_pipeline.to_json())
+        attributes_pip = {"gitlab.resource.type": "pipeline"}
+        # Grab pipeline attributes
+        current_pipeline_attributes = create_resource_attributes(parse_attributes(pipeline_json),GLAB_SERVICE_NAME)      
+        # Check wich dimension to set on each metric
+        currrent_pipeline_metrics_attributes = parse_metrics_attributes(current_pipeline_attributes)
+        currrent_pipeline_metrics_attributes[2].update(attributes_pip)
+        # Update attributes for the log events
+        current_pipeline_attributes.update(attributes_pip)
+        # Send pipeline metrics with configured dimensions
+        gitlab_pipelines_duration.add(currrent_pipeline_metrics_attributes[0],currrent_pipeline_metrics_attributes[2])
+        gitlab_pipelines_queued_duration.add(currrent_pipeline_metrics_attributes[1],currrent_pipeline_metrics_attributes[2])
+        # Send pipeline data as log events with attributes
+        msg = "Pipeline: "+ str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) 
+        global_logger._log(level=logging.INFO,msg=msg,extra=current_pipeline_attributes,args="")   
+        print("Metrics sent for pipeline: " + str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
+        print("Log events sent for pipeline: " + str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
+    except Exception as e:
+        print("Failed to obtain pipelines for project",project_id," due to error ", e)
+
+def grab_pipeline_data(pipelineobject,current_project,project_id,GLAB_SERVICE_NAME):
+    global q
+    pipeline=current_project.pipelines.get(pipelineobject.id)
+    q.put([pipeline,project_id,GLAB_SERVICE_NAME,"pipeline"])
+
+
+async def get_pipelines(current_project,project_id,GLAB_SERVICE_NAME):
+    print("Gathering pipeline data for project " + str(project_id) + " this may take while...")
+    pipelines = current_project.pipelines.list(iterator=True, per_page=100, updated_after=str((datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)))))
+    print("Found",len(pipelines),"pipelines","in project",project_id, "processsing please wait...")
+    if len(pipelines)> 0: # check if there are pipelines in this project
+        # setting workers to 5 due to gitlab api limits
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor: 
+            for pipelineobject in pipelines:
+                executor.submit(grab_pipeline_data, pipelineobject,current_project,project_id,GLAB_SERVICE_NAME)
+                executor.submit(get_jobs, pipelineobject,current_project,project_id,GLAB_SERVICE_NAME)
+
+def parse_job(data):
+    job_json = data[0]
+    project_id = data[1]
+    GLAB_SERVICE_NAME = data[2]
+    current_pipeline_json = data[4]    
+    try:
+        #Grab job attributes
+        current_job_attributes = create_resource_attributes(parse_attributes(job_json),GLAB_SERVICE_NAME)
+        attributes_j = {"gitlab.resource.type": "job"}
+        #Check wich dimension to set on each metric
+        job_metrics_attributes = parse_metrics_attributes(current_job_attributes)
+        job_metrics_attributes[2].update(attributes_j)
+        # Update attributes for the log events
+        current_job_attributes.update(attributes_j)
+        #Send job metrics with configured dimensions
+        gitlab_jobs_duration.add(job_metrics_attributes[0],job_metrics_attributes[2])
+        gitlab_jobs_queued_duration.add(job_metrics_attributes[1],job_metrics_attributes[2])
+        #Send job data as log events with attributes
+        msg = "Job: "+ str(job_json['id']) + " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) 
+        global_logger._log(level=logging.INFO,msg=msg,extra=current_job_attributes,args="")   
+        print("Metrics sent for job: " + str(job_json['id'])+ " for pipeline: "+ str(current_pipeline_json['id'])+ " from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
+        print("Log events sent for job: " + str(job_json['id']) + " for pipeline: "+ str(current_pipeline_json['id'])+ " from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))          
+
+    except Exception as e:
+        print("Failed to obtain jobs for project",project_id," due to error ", e)
+        
+def get_jobs(pipelineobject,current_project,project_id,GLAB_SERVICE_NAME):
+    global q
+    current_pipeline=current_project.pipelines.get(pipelineobject.id)
+    jobs = current_pipeline.jobs.list(get_all=True)
+    current_pipeline_json = json.loads(current_pipeline.to_json())
+    if len(jobs) > 0:
         #Collect job information
         for job in jobs:
             #Ensure we don't export data for exporters jobs
             job_json = json.loads(job.to_json())
             if (job_json['stage']) not in ["new-relic-exporter", "new-relic-metrics-exporter"]:
-                #Grab job attributes
-                current_job_attributes = create_resource_attributes(parse_attributes(job_json),GLAB_SERVICE_NAME)
-                attributes_j = {"gitlab.resource.type": "job"}
-                #Check wich dimension to set on each metric
-                job_metrics_attributes = parse_metrics_attributes(current_job_attributes)
-                job_metrics_attributes[2].update(attributes_j)
-                # Update attributes for the log events
-                current_job_attributes.update(attributes_j)
-                #Send job metrics with configured dimensions
-                gitlab_jobs_duration.add(job_metrics_attributes[0],job_metrics_attributes[2])
-                gitlab_jobs_queued_duration.add(job_metrics_attributes[1],job_metrics_attributes[2])
-                #Send job data as log events with attributes
-                msg = "Job: "+ str(job_json['id']) + " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) 
-                global_logger._log(level=logging.INFO,msg=msg,extra=current_job_attributes,args="")   
-                print("Metrics sent for job: " + str(job_json['id'])+ " for pipeline: "+ str(current_pipeline_json['id'])+ " from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))
-                print("Log events sent for job: " + str(job_json['id']) + " for pipeline: "+ str(current_pipeline_json['id'])+ " from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME))          
+                q.put([job_json,project_id,GLAB_SERVICE_NAME,"job",current_pipeline_json])     
 
-    except Exception as e:
-        print("Failed to obtain jobs for project",project_id," due to error ", e)
