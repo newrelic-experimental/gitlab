@@ -1,6 +1,7 @@
 import os
 from custom_parsers import check_env_vars
 import gitlab
+from queue import Queue
 
 #Ensure that mandatory variables are configured before starting
 check_env_vars()
@@ -23,6 +24,10 @@ global headers
 global paths
 global GLAB_EXPORT_LOGS
 global GLAB_DORA_METRICS
+global q
+
+# Initializing a queue
+q = Queue()
 
 GLAB_DORA_METRICS=False
 GLAB_EXPORT_LOGS=True

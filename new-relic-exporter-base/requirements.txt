@@ -7,3 +7,5 @@ pyrfc3339
 zulu
 schedule
 regex
+asyncio
+pandas
