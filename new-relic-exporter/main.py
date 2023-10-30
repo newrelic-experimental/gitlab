@@ -9,9 +9,8 @@ from opentelemetry.trace import Status, StatusCode
 from otel import create_resource_attributes, get_logger, get_tracer
 from global_variables import *
 import re
-import asyncio
 
-async def send_to_nr():
+def send_to_nr():
     # Set local variables
     project_id = os.getenv('CI_PROJECT_ID')
     pipeline_id = os.getenv('CI_PARENT_PIPELINE')
