@@ -300,8 +300,8 @@ def get_jobs(pipelineobject,current_project,project_id,GLAB_SERVICE_NAME):
     if len(jobs) > 0:
         #Collect job information
         for job in jobs:
-            #Ensure we don't export data for exporters jobs
+            #Ensure we don't export data for exporters jobs and only export jobs that have been created in the last GLAB_EXPORT_LAST_MINUTES minutes
             job_json = json.loads(job.to_json())
-            if (job_json['stage']) not in ["new-relic-exporter", "new-relic-metrics-exporter"]:
+            if (job_json['stage']) not in ["new-relic-exporter", "new-relic-metrics-exporter"] and zulu.parse(job_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
                 q.put([job_json,project_id,GLAB_SERVICE_NAME,"job",current_pipeline_json])     
 
