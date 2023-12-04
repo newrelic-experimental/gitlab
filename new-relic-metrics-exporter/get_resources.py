@@ -73,10 +73,10 @@ async def grab_data(project):
         GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
         project_json = json.loads(project.to_json())
         # Check if we should export only data for specific groups/projects
-        if paths:
+        if paths or GLAB_EXPORT_ALL:
             for path in paths:          
-                if str(project_json["namespace"]["full_path"]) == (str(path)):
-                    if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
+                if str(project_json["namespace"]["full_path"]) == (str(path)) or GLAB_EXPORT_ALL:
+                    if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]) or GLAB_EXPORT_ALL:
                         try:
                             print("Project: "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "") + " matched configuration, collecting data...")
                             project_id = json.loads(project.to_json())["id"]
