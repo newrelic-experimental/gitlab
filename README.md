@@ -58,8 +58,8 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
 | `GLAB_ATTRIBUTES_DROP` | Attributes to drop from logs and spans events | True | List* | None |
 | `GLAB_DIMENSION_METRICS` | Extra dimensional metric attributes to add to each metric | True | List* | NONE Note the following attributes will always be set as dimensions regardless of this setting: status,stage,name |
+| `GLAB_RUNNERS_SCOPE` | Get runners scope : owned, all, active, paused, online, specific, shared (separated by comma) | True | List* | owned |
 | `GLAB_STANDALONE` | Set to True if not running as gitlab pipeline schedule | True | Boolean | False |
-| `GLAB_RUNNERS_SCOPE` | Get runners scope : owned, all, active, paused, online, specific, shared (separated by comma) | True | string | owned |
 | `GLAB_ENVS_DROP` | Extra system environment variables to drop from span attributes | True | List* | Note the following environment variables will always be dropped regardless of this setting: NEW_RELIC_API_KEY,GITLAB_FEATURES,CI_SERVER_TLS_CA_FILE,CI_RUNNER_TAGS,CI_JOB_JWT,CI_JOB_JWT_V1,CI_JOB_JWT_V2,GLAB_TOKEN,GIT_ASKPASS,CI_COMMIT_BEFORE_SHA,CI_BUILD_TOKEN,CI_DEPENDENCY_PROXY_PASSWORD,CI_RUNNER_SHORT_TOKEN,CI_BUILD_BEFORE_SHA,CI_BEFORE_SHA,OTEL_EXPORTER_OTEL_ENDPOINT,GLAB_DIMENSION_METRICS |
 *comma separated
 
