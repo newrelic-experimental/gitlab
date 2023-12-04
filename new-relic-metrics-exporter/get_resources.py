@@ -40,20 +40,30 @@ gitlab_jobs_queued_duration=global_meter.create_counter("gitlab_jobs.queued_dura
                 
 def get_runners():
     try:
-        runners = gl.runners.list() #obtains the list available runners to this user(https://python-gitlab.readthedocs.io/en/stable/gl_objects/runners.html)
+        # runners = gl.runners.list() #obtains the list available runners to this user(https://python-gitlab.readthedocs.io/en/stable/gl_objects/runners.html)
         # runners = gl.runners_all.list() #Get a list of all runners in the GitLab instance (specific and shared). Access is restricted to users with administrator access.(https://python-gitlab.readthedocs.io/en/stable/gl_objects/runners.html)
+        # init runners var
+        runners = []
+        if 'owned' in GLAB_RUNNERS_SCOPE:
+            for scope in GLAB_RUNNERS_SCOPE:
+                if scope != 'owned':
+                    runners.extend(gl.runners.list(scope=scope))
+        elif 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
+            runners = gl.runners_all.list()
+        else:
+            for scope in GLAB_RUNNERS_SCOPE:
+                runners.extend(gl.runners_all.list(scope=scope))
         if len(runners) == 0:
             print("Number of runners found available to this user is",len(runners),"not exporting any runner data")
         else:
             for runner in runners:
                 runner_json = json.loads(runner.to_json())
-                if str(runner_json ["is_shared"]).lower() == "false":
-                    runner_attributes = create_resource_attributes(parse_attributes(runner_json),GLAB_SERVICE_NAME)                
-                    runner_attributes.update({"gitlab.resource.type": "runner"})
-                    #Send runner data as log events with attributes
-                    msg = "Runner: "+ str(runner_json['id'])
-                    global_logger._log(level=logging.INFO,msg=msg,extra=runner_attributes,args="")
-                    print("Log events sent for runner: " + str(runner_json['id']))
+                runner_attributes = create_resource_attributes(parse_attributes(runner_json),GLAB_SERVICE_NAME)                
+                runner_attributes.update({"gitlab.resource.type": "runner"})
+                #Send runner data as log events with attributes
+                msg = "Runner: "+ str(runner_json['id'])
+                global_logger._log(level=logging.INFO,msg=msg,extra=runner_attributes,args="")
+                print("Log events sent for runner: " + str(runner_json['id']))
     except Exception as e:
         print("Unable to obtain runners due to ",str(e))
         
