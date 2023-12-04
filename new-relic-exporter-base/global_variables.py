@@ -40,6 +40,7 @@ NEW_RELIC_API_KEY = os.getenv('NEW_RELIC_API_KEY')
 GLAB_TOKEN = os.getenv('GLAB_TOKEN')
 GLAB_EXPORT_PROJECTS_REGEX =".*"
 GLAB_EXPORT_PATHS = ""
+GLAB_RUNNERS_SCOPE = "owned"
 
 # Check export logs is set
 if "GLAB_DORA_METRICS" in os.environ and os.getenv('GLAB_DORA_METRICS').lower() == "true":
@@ -103,6 +104,12 @@ else:
         OTEL_EXPORTER_OTEL_ENDPOINT = "https://otlp.eu01.nr-data.net:4318"
     else:
         OTEL_EXPORTER_OTEL_ENDPOINT = "https://otlp.nr-data.net:4318"
+
+# Check runners scope
+if "GLAB_RUNNERS_SCOPE" in os.environ:
+    # Split comma separated values into a list
+    GLAB_RUNNERS_SCOPE = os.getenv('GLAB_RUNNERS_SCOPE').split(",")
+
         
 #Set variables to use for OTEL metrics and logs exporters
 endpoint="{}".format(OTEL_EXPORTER_OTEL_ENDPOINT)
