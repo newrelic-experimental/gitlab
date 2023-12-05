@@ -54,6 +54,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you�
 | `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | True | Bool | False |
 | `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against “.*” for all | False | Boolean | None |
+| `GLAB_EXPORT_ALL` | When True ignore  GLAB_EXPORT_PATHS and GLAB_EXPORT_PROJECTS_REGEX variables and export all projects in any groups or subgroups| False |  Boolean | False |
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
 | `GLAB_ATTRIBUTES_DROP` | Attributes to drop from logs and spans events | True | List* | None |
