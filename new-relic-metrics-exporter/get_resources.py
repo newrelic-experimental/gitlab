@@ -69,56 +69,49 @@ def get_runners():
         
 async def grab_data(project):
     try:
-        #Collect project information
+        # Collect project information
         GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
         project_json = json.loads(project.to_json())
         # Check if we should export only data for specific groups/projects
-        if paths or GLAB_EXPORT_ALL:
-            for path in paths:          
-                if str(project_json["namespace"]["full_path"]) == (str(path)) or GLAB_EXPORT_ALL:
-                    if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]) or GLAB_EXPORT_ALL:
-                        try:
-                            print("Project: "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "") + " matched configuration, collecting data...")
-                            project_id = json.loads(project.to_json())["id"]
-                            GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
-                            await asyncio.gather(get_pipelines(project,project_id,GLAB_SERVICE_NAME))
-
-                            if q.qsize() != 0:
-                                while q.qsize() > 0:
-                                    data = q.get()
-                                    if data[3] == "deployment":
-                                        parse_deployment(data)
-                                    elif data[3] == "environment":
-                                        parse_environment(data)
-                                    elif data[3] == "release":
-                                        parse_release(data)
-                                    elif data[3] == "pipeline":
-                                        parse_pipeline(data)
-                                    elif data[3] == "job":
-                                        parse_job(data)
-                                    # To bypass issues with overloading global logger with too much data
-                                    time.sleep(0.05)
-                        except Exception as e:
-                            print(str(e) + " -> Failed to collect data for project:  "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")+" check your configuration.",project_json)
-                        if GLAB_DORA_METRICS:
-                            try:
-                                get_dora_metrics(project)
-                            except Exception as e:
-                                print("Unable to obtain DORA metrics ",e)
-                        # If we don't need to export all projects each time
-                        if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                            #Send project information as log events with attributes
-                            c_attributes = create_resource_attributes(parse_attributes(project_json), GLAB_SERVICE_NAME)
-                            c_attributes.update({"gitlab.resource.type": "project"})
-                            msg = "Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) 
-                            global_logger._log(level=logging.INFO,msg=msg,extra=c_attributes,args="")
-                            print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))              
-                    else:
-                        print("No project name matched configured regex " + "\"" + str(GLAB_EXPORT_PROJECTS_REGEX)+ "\" in path " + "\""+str(path)+"\"")
-        else:
-            print("GLAB_EXPORT_PATHS not configured")
-            exit(1)  
-                 
+        if GLAB_EXPORT_PATHS_ALL or (paths and str(project_json["namespace"]["full_path"]) in paths):
+            if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
+                try:
+                    print("Project: "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "") + " matched configuration, collecting data...")
+                    project_id = json.loads(project.to_json())["id"]
+                    GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
+                    await asyncio.gather(get_pipelines(project,project_id,GLAB_SERVICE_NAME))
+                    if q.qsize() != 0:
+                        while q.qsize() > 0:
+                            data = q.get()
+                            if data[3] == "deployment":
+                                parse_deployment(data)
+                            elif data[3] == "environment":
+                                parse_environment(data)
+                            elif data[3] == "release":
+                                parse_release(data)
+                            elif data[3] == "pipeline":
+                                parse_pipeline(data)
+                            elif data[3] == "job":
+                                parse_job(data)
+                            # To bypass issues with overloading global logger with too much data
+                            time.sleep(0.05)
+                except Exception as e:
+                    print(str(e) + " -> Failed to collect data for project:  "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")+" check your configuration.",project_json)
+                if GLAB_DORA_METRICS:
+                    try:
+                        get_dora_metrics(project)
+                    except Exception as e:
+                        print("Unable to obtain DORA metrics ",e)
+                # If we don't need to export all projects each time
+                if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                    #Send project information as log events with attributes
+                    c_attributes = create_resource_attributes(parse_attributes(project_json), GLAB_SERVICE_NAME)
+                    c_attributes.update({"gitlab.resource.type": "project"})
+                    msg = "Project: "+ str(project_json['id']) + " - "+ str(GLAB_SERVICE_NAME) 
+                    global_logger._log(level=logging.INFO,msg=msg,extra=c_attributes,args="")
+                    print("Log events sent for project: " + str(project_json['id']) + " - " + str(GLAB_SERVICE_NAME))              
+            else:
+                print("No project name matched configured regex " + "\"" + str(GLAB_EXPORT_PROJECTS_REGEX)+ "\" in paths " + "\""+str(paths)+"\"")
     except Exception as e:
         print(str(e) + " -> ERROR obtaining data for project:  "+str((project.attributes.get('name_with_namespace'))).lower().replace(" ", ""))
 
