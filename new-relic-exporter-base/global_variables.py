@@ -40,6 +40,7 @@ NEW_RELIC_API_KEY = os.getenv('NEW_RELIC_API_KEY')
 GLAB_TOKEN = os.getenv('GLAB_TOKEN')
 GLAB_EXPORT_PROJECTS_REGEX =".*"
 GLAB_EXPORT_PATHS = ""
+GLAB_EXPORT_PATHS_ALL = False
 GLAB_RUNNERS_SCOPE = "owned"
 
 # Check export logs is set
@@ -57,6 +58,9 @@ else:
 # Check if project name regex is set
 if "GLAB_EXPORT_PROJECTS_REGEX" in os.environ:
     GLAB_EXPORT_PROJECTS_REGEX = os.getenv('GLAB_EXPORT_PROJECTS_REGEX')
+
+if "GLAB_EXPORT_PATHS_ALL" in os.environ and os.getenv('GLAB_EXPORT_PATHS_ALL').lower() == "true":
+    GLAB_EXPORT_PATHS_ALL = True
 
 # Check base path
 if "GLAB_EXPORT_PATHS" in os.environ:

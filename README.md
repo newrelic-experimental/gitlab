@@ -54,6 +54,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you�
 | `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | True | Bool | False |
 | `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against “.*” for all | False | Boolean | None |
+| `GLAB_EXPORT_PATHS_ALL` | When True ignore GLAB_EXPORT_PATHS variable and export projects matching GLAB_EXPORT_PROJECTS_REGEX in any groups or subgroups| True |  Boolean | False |
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
 | `GLAB_ATTRIBUTES_DROP` | Attributes to drop from logs and spans events | True | List* | None |
@@ -69,7 +70,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-metrics-exporter:1.0.8
+    name: docker.io/dpacheconr/gitlab-metrics-exporter:1.0.11
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
@@ -86,7 +87,7 @@ image:
 Alternative to running new relic metrics exporter as pipeline schedule:
 Rather than running in a GitLab pipeline the New Relic Metrics exporter can also  be run independently enabling standalone mode. To run in Docker for instance run the following:
  
-docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.8
+docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.11
 
 ## Contributing
 
