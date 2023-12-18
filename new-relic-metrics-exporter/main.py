@@ -13,8 +13,10 @@ def send_to_nr(project):
 
 
 def run():
-    projects = gl.projects.list(owned=GLAB_PROJECT_OWNERSHIP,visibility=GLAB_PROJECT_VISIBILITY,get_all=True)
-    print("Found total of " + str(len(projects)) + " projects using -> OWNED: " + str(GLAB_PROJECT_OWNERSHIP) + " and VISIBILITY: " + str(GLAB_PROJECT_VISIBILITY) + ". \nChecking which ones match provided paths and project regex configuration")  
+    projects = []
+    for visibility in GLAB_PROJECT_VISIBILITIES:
+        projects.extend(gl.projects.list(owned=GLAB_PROJECT_OWNERSHIP,visibility=visibility,get_all=True))
+    print("Found total of " + str(len(projects)) + " projects using -> OWNED: " + str(GLAB_PROJECT_OWNERSHIP) + " and VISIBILITIES: " + str(GLAB_PROJECT_VISIBILITIES) + ". \nChecking which ones match provided paths and project regex configuration")  
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     tasks = [send_to_nr(project) for project in projects]
@@ -27,7 +29,9 @@ def run():
         return "DONE"
     
 if __name__ == '__main__':
-    projects = gl.projects.list(owned=GLAB_PROJECT_OWNERSHIP,visibility=GLAB_PROJECT_VISIBILITY,get_all=True)
+    projects = []
+    for visibility in GLAB_PROJECT_VISIBILITIES:
+        projects.extend(gl.projects.list(owned=GLAB_PROJECT_OWNERSHIP,visibility=visibility,get_all=True))
     if len(projects) == 0:
         print("Nothing to export check your configuration!!!")
     else:
