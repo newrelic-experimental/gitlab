@@ -20,6 +20,8 @@ def create_resource_attributes(atts, GLAB_SERVICE_NAME):
     for att in atts:     
         if att != "name":
             attributes[att]=atts[att]
+        else:
+            attributes["resource.name"]=atts[attr]
     return attributes
 
 def get_logger(endpoint, headers, resource, name):
