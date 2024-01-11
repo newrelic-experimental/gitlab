@@ -44,11 +44,7 @@ def get_runners():
         # runners = gl.runners_all.list() #Get a list of all runners in the GitLab instance (specific and shared). Access is restricted to users with administrator access.(https://python-gitlab.readthedocs.io/en/stable/gl_objects/runners.html)
         # init runners var
         runners = []
-        if 'owned' in GLAB_RUNNERS_SCOPE:
-            for scope in GLAB_RUNNERS_SCOPE:
-                if scope != 'owned':
-                    runners.extend(gl.runners.list(scope=scope,get_all=True))
-        elif 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
+        if 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
             runners = gl.runners_all.list(get_all=True)
         else:
             for scope in GLAB_RUNNERS_SCOPE:

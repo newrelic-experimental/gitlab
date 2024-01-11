@@ -41,7 +41,7 @@ GLAB_TOKEN = os.getenv('GLAB_TOKEN')
 GLAB_EXPORT_PROJECTS_REGEX =".*"
 GLAB_EXPORT_PATHS = ""
 GLAB_EXPORT_PATHS_ALL = False
-GLAB_RUNNERS_SCOPE = ["owned",]
+GLAB_RUNNERS_SCOPE = ["all",]
 
 # Check export logs is set
 if "GLAB_DORA_METRICS" in os.environ and os.getenv('GLAB_DORA_METRICS').lower() == "true":
