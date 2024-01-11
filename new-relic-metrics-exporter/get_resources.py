@@ -47,12 +47,12 @@ def get_runners():
         if 'owned' in GLAB_RUNNERS_SCOPE:
             for scope in GLAB_RUNNERS_SCOPE:
                 if scope != 'owned':
-                    runners.extend(gl.runners.list(scope=scope))
+                    runners.extend(gl.runners.list(scope=scope,get_all=True))
         elif 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
             runners = gl.runners_all.list(get_all=True)
         else:
             for scope in GLAB_RUNNERS_SCOPE:
-                runners.extend(gl.runners_all.list(scope=scope))
+                runners.extend(gl.runners_all.list(scope=scope,get_all=True))
         if len(runners) == 0:
             print("Number of runners found available to this user is",len(runners),"not exporting any runner data")
         else:
