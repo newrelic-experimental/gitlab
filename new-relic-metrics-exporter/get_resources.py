@@ -49,7 +49,7 @@ def get_runners():
                 if scope != 'owned':
                     runners.extend(gl.runners.list(scope=scope))
         elif 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
-            runners = gl.runners_all.list()
+            runners = gl.runners_all.list(get_all=True)
         else:
             for scope in GLAB_RUNNERS_SCOPE:
                 runners.extend(gl.runners_all.list(scope=scope))
