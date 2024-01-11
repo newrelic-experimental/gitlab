@@ -50,7 +50,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you�
 | `GLAB_TOKEN` | MASKED - Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
 | `GLAB_PROJECT_OWNERSHIP` | Project ownership | False | String | True |
-| `GLAB_PROJECT_VISIBILITY` | Project visibility | False | String | private |
+| `GLAB_PROJECT_VISIBILITIES` | Project visibilities (public,private,internal) | False | List* | private |
 | `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | True | Bool | False |
 | `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against “.*” for all | False | Boolean | None |

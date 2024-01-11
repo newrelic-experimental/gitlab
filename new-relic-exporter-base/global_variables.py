@@ -10,7 +10,7 @@ check_env_vars()
 global GLAB_STANDALONE
 global GLAB_EXPORT_LAST_MINUTES
 global GLAB_PROJECT_OWNERSHIP
-global GLAB_PROJECT_VISIBILITY
+global GLAB_PROJECT_VISIBILITIES
 global GLAB_SERVICE_NAME
 global NEW_RELIC_API_KEY
 global GLAB_TOKEN
@@ -34,7 +34,7 @@ GLAB_EXPORT_LOGS=True
 GLAB_STANDALONE=False
 GLAB_EXPORT_LAST_MINUTES=61
 GLAB_PROJECT_OWNERSHIP=True
-GLAB_PROJECT_VISIBILITY="private"
+GLAB_PROJECT_VISIBILITIES="private"
 GLAB_SERVICE_NAME="gitlab-exporter" # default -> updates dynamically with each project name 
 NEW_RELIC_API_KEY = os.getenv('NEW_RELIC_API_KEY')
 GLAB_TOKEN = os.getenv('GLAB_TOKEN')
@@ -88,8 +88,8 @@ if "GLAB_PROJECT_OWNERSHIP" in os.environ and os.getenv('GLAB_PROJECT_OWNERSHIP'
     GLAB_PROJECT_OWNERSHIP = False  
    
         
-if "GLAB_PROJECT_VISIBILITY" in os.environ:
-    GLAB_PROJECT_VISIBILITY = os.getenv('GLAB_PROJECT_VISIBILITY')
+if "GLAB_PROJECT_VISIBILITIES" in os.environ:
+    GLAB_PROJECT_VISIBILITIES = os.getenv('GLAB_PROJECT_VISIBILITIES').split(",")
     
 # Check if we running as pipeline schedule or standalone mode   
 if "GLAB_STANDALONE" in os.environ and os.getenv('GLAB_STANDALONE').lower() == "true":
