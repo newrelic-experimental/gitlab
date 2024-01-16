@@ -33,10 +33,10 @@ global_logger = get_logger(endpoint,headers,global_resource,"global_logger")
 
 #Global meter
 global_meter = get_meter(endpoint,headers,global_resource,"global_meter")
-gitlab_pipelines_duration=global_meter.create_counter("gitlab_pipelines.duration")
-gitlab_pipelines_queued_duration=global_meter.create_counter("gitlab_pipelines.queued_duration")
-gitlab_jobs_duration=global_meter.create_counter("gitlab_jobs.duration")
-gitlab_jobs_queued_duration=global_meter.create_counter("gitlab_jobs.queued_duration")
+gitlab_pipelines_duration=global_meter.create_up_down_counter("gitlab_pipelines.duration")
+gitlab_pipelines_queued_duration=global_meter.create_up_down_counter("gitlab_pipelines.queued_duration")
+gitlab_jobs_duration=global_meter.create_up_down_counter("gitlab_jobs.duration")
+gitlab_jobs_queued_duration=global_meter.create_up_down_counter("gitlab_jobs.queued_duration")
                 
 def get_runners():
     try:
@@ -238,8 +238,8 @@ def parse_pipeline(data):
         # Update attributes for the log events
         current_pipeline_attributes.update(attributes_pip)
         # Send pipeline metrics with configured dimensions
-        gitlab_pipelines_duration.add(currrent_pipeline_metrics_attributes[0],currrent_pipeline_metrics_attributes[2])
-        gitlab_pipelines_queued_duration.add(currrent_pipeline_metrics_attributes[1],currrent_pipeline_metrics_attributes[2])
+        gitlab_pipelines_duration.add(float(currrent_pipeline_metrics_attributes[0]),currrent_pipeline_metrics_attributes[2])
+        gitlab_pipelines_queued_duration.add(float(currrent_pipeline_metrics_attributes[1]),currrent_pipeline_metrics_attributes[2])
         # Send pipeline data as log events with attributes
         msg = "Pipeline: "+ str(pipeline_id)+ " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) 
         global_logger._log(level=logging.INFO,msg=msg,extra=current_pipeline_attributes,args="")   
@@ -280,8 +280,8 @@ def parse_job(data):
         # Update attributes for the log events
         current_job_attributes.update(attributes_j)
         #Send job metrics with configured dimensions
-        gitlab_jobs_duration.add(job_metrics_attributes[0],job_metrics_attributes[2])
-        gitlab_jobs_queued_duration.add(job_metrics_attributes[1],job_metrics_attributes[2])
+        gitlab_jobs_duration.add(float(job_metrics_attributes[0]),job_metrics_attributes[2])
+        gitlab_jobs_queued_duration.add(float(job_metrics_attributes[1]),job_metrics_attributes[2])
         #Send job data as log events with attributes
         msg = "Job: "+ str(job_json['id']) + " - " + "from project: " + str(project_id)+ " - " + str(GLAB_SERVICE_NAME) 
         global_logger._log(level=logging.INFO,msg=msg,extra=current_job_attributes,args="")   
