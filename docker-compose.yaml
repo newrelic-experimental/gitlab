@@ -1,4 +1,3 @@
-version: '3.9'
 services:
   new-relic-exporter-base:
     build:

@@ -25,6 +25,7 @@ global paths
 global GLAB_EXPORT_LOGS
 global GLAB_DORA_METRICS
 global q
+global GLAB_RUNNERS_INSTANCE
 
 # Initializing a queue
 q = Queue()
@@ -42,7 +43,15 @@ GLAB_EXPORT_PROJECTS_REGEX =".*"
 GLAB_EXPORT_PATHS = ""
 GLAB_EXPORT_PATHS_ALL = False
 GLAB_RUNNERS_SCOPE = ["all",]
+GLAB_RUNNERS_INSTANCE = True
 
+# Check runners permissions to obtain all runners in instance
+if "GLAB_RUNNERS_INSTANCE" in os.environ and os.getenv('GLAB_RUNNERS_INSTANCE').lower() == "false":
+    GLAB_RUNNERS_INSTANCE = False
+else:
+    GLAB_RUNNERS_INSTANCE = True
+           
+           
 # Check export logs is set
 if "GLAB_DORA_METRICS" in os.environ and os.getenv('GLAB_DORA_METRICS').lower() == "true":
     GLAB_DORA_METRICS = os.getenv('GLAB_DORA_METRICS')

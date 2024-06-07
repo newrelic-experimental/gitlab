@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 import pytz
 import zulu
 from opentelemetry.sdk.resources import Resource
@@ -44,22 +44,32 @@ def get_runners():
         # runners = gl.runners_all.list() #Get a list of all runners in the GitLab instance (specific and shared). Access is restricted to users with administrator access.(https://python-gitlab.readthedocs.io/en/stable/gl_objects/runners.html)
         # init runners var
         runners = []
-        if 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
+        if GLAB_RUNNERS_INSTANCE:
             runners = gl.runners_all.list(get_all=True)
-        else:
-            for scope in GLAB_RUNNERS_SCOPE:
-                runners.extend(gl.runners_all.list(scope=scope,get_all=True))
-        if len(runners) == 0:
-            print("Number of runners found available to this user is",len(runners),"not exporting any runner data")
-        else:
-            for runner in runners:
-                runner_json = json.loads(runner.to_json())
-                runner_attributes = create_resource_attributes(parse_attributes(runner_json),GLAB_SERVICE_NAME)                
-                runner_attributes.update({"gitlab.resource.type": "runner"})
-                #Send runner data as log events with attributes
-                msg = "Runner: "+ str(runner_json['id'])
-                global_logger._log(level=logging.INFO,msg=msg,extra=runner_attributes,args="")
-                print("Log events sent for runner: " + str(runner_json['id']))
+            if 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
+                runners = gl.runners_all.list(get_all=True)
+            else:
+                for scope in GLAB_RUNNERS_SCOPE:
+                    runners.extend(gl.runners_all.list(scope=scope,get_all=True))
+        else: 
+            if 'all' in GLAB_RUNNERS_SCOPE and len(GLAB_RUNNERS_SCOPE) == 1:
+                runners = gl.runners.list(get_all=True)
+            else:
+                for scope in GLAB_RUNNERS_SCOPE:
+                    runners.extend(gl.runners.list(scope=scope,get_all=True))
+                    
+            if len(runners) == 0:
+                print("Number of runners found available to this user is",len(runners),"not exporting any runner data")
+            else:
+                for runner in runners:
+                    runner_json = json.loads(runner.to_json())
+                    runner_attributes = create_resource_attributes(parse_attributes(runner_json),GLAB_SERVICE_NAME)                
+                    runner_attributes.update({"gitlab.resource.type": "runner"})
+                    #Send runner data as log events with attributes
+                    msg = "Runner: "+ str(runner_json['id'])
+                    global_logger._log(level=logging.INFO,msg=msg,extra=runner_attributes,args="")
+                    print("Log events sent for runner: " + str(runner_json['id']))
+                    
     except Exception as e:
         print("Unable to obtain runners due to ",str(e))
         
@@ -76,6 +86,9 @@ async def grab_data(project):
                     project_id = json.loads(project.to_json())["id"]
                     GLAB_SERVICE_NAME = str((project.attributes.get('name_with_namespace'))).lower().replace(" ", "")
                     await asyncio.gather(get_pipelines(project,project_id,GLAB_SERVICE_NAME))
+                    await asyncio.gather(get_deployments(project,project_id,GLAB_SERVICE_NAME)) 
+                    await asyncio.gather(get_environments(project,project_id,GLAB_SERVICE_NAME))
+                    await asyncio.gather(get_releases(project,project_id,GLAB_SERVICE_NAME))
                     if q.qsize() != 0:
                         while q.qsize() > 0:
                             data = q.get()
@@ -99,7 +112,7 @@ async def grab_data(project):
                     except Exception as e:
                         print("Unable to obtain DORA metrics ",e)
                 # If we don't need to export all projects each time
-                if zulu.parse(project_json["last_activity_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+                if zulu.parse(project_json["last_activity_at"]) >= (datetime.now(timezone.utc).replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
                     #Send project information as log events with attributes
                     c_attributes = create_resource_attributes(parse_attributes(project_json), GLAB_SERVICE_NAME)
                     c_attributes.update({"gitlab.resource.type": "project"})
@@ -167,13 +180,17 @@ def parse_deployment(data):
 async def get_deployments(current_project,project_id,GLAB_SERVICE_NAME):
     global q
     deployments = current_project.deployments.list(get_all=True, order_by="created_at", sort="desc")
+    deployments_matching=0
     if len(deployments) > 0: # check if there are deployments in this project
         for deployment in deployments:
             deployment_json = json.loads(deployment.to_json())
-            if zulu.parse(deployment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+            if zulu.parse(deployment_json["created_at"]) >= (datetime.now(timezone.utc).replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
                 q.put([deployment_json,project_id,GLAB_SERVICE_NAME,"deployment"])
+                deployments_matching +=1
             else:
                 break
+        print("Number of deployments found",str(len(deployments)))
+        print("Number of deployments that matched export configuration",str(deployments_matching))
 
 def parse_environment(data):
     environment_json = data[0]
@@ -195,9 +212,14 @@ async def get_environments(current_project,project_id,GLAB_SERVICE_NAME):
     if len(environments) > 0: # check if there are environments in this project
         for environment in environments:        
             environment_json = json.loads(environment.to_json())
-            if zulu.parse(environment_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
-                q.put([environment_json,project_id,GLAB_SERVICE_NAME,"environment"])
+            # we should send data for every environment each time 
+            q.put([environment_json,project_id,GLAB_SERVICE_NAME,"environment"])
+            
+        print("Number of environments found",str(len(environments)))
+    else: 
+        print("No environments found in project ",str(project_id))
 
+        
 def parse_release(data):
     release_json = data[0]
     project_id = data[1]
@@ -215,13 +237,18 @@ def parse_release(data):
 async def get_releases(current_project,project_id,GLAB_SERVICE_NAME):
     global q
     releases = current_project.releases.list(get_all=True, order_by="created_at", sort="desc")
+    releases_matching = 0
     if len(releases) > 0: # check if there are releases in this project
         for release in releases:
             release_json = json.loads(release.to_json())
-            if zulu.parse(release_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+            if zulu.parse(release_json["created_at"]) >= (datetime.now(timezone.utc).replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
                 q.put([release_json,project_id,GLAB_SERVICE_NAME,"release"])
+                releases_matching += 1
             else:
                 break
+            
+        print("Number of releases found",str(len(releases)))
+        print("Number of releases that matched export configuration",str(releases_matching))
 
 def parse_pipeline(data):
     pipeline_json=json.loads(data[0].to_json())
@@ -256,7 +283,7 @@ def grab_pipeline_data(pipelineobject,current_project,project_id,GLAB_SERVICE_NA
 
 async def get_pipelines(current_project,project_id,GLAB_SERVICE_NAME):
     print("Gathering pipeline data for project " + str(project_id) + " this may take while...")
-    pipelines = current_project.pipelines.list(iterator=True, per_page=100, updated_after=str((datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)))))
+    pipelines = current_project.pipelines.list(iterator=True, per_page=100, updated_after=str((datetime.now(timezone.utc).replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)))))
     print("Found",len(pipelines),"pipelines","in project",project_id, "processsing please wait...")
     if len(pipelines)> 0: # check if there are pipelines in this project
         # setting workers to 5 due to gitlab api limits
@@ -301,6 +328,6 @@ def get_jobs(pipelineobject,current_project,project_id,GLAB_SERVICE_NAME):
         for job in jobs:
             #Ensure we don't export data for exporters jobs and only export jobs that have been created in the last GLAB_EXPORT_LAST_MINUTES minutes
             job_json = json.loads(job.to_json())
-            if (job_json['stage']) not in ["new-relic-exporter", "new-relic-metrics-exporter"] and zulu.parse(job_json["created_at"]) >= (datetime.utcnow().replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
+            if (job_json['stage']) not in ["new-relic-exporter", "new-relic-metrics-exporter"] and zulu.parse(job_json["created_at"]) >= (datetime.now(timezone.utc).replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))):
                 q.put([job_json,project_id,GLAB_SERVICE_NAME,"job",current_pipeline_json])     
 
