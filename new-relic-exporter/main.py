@@ -43,7 +43,7 @@ def send_to_nr():
     "pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),
     "project_id": str(os.getenv('CI_PROJECT_ID')),
     "gitlab.source": "gitlab-exporter",
-    "gitlab.resource.type": "span"
+    "gitlab.resource.type": "pipeline"
     })
     
     LoggingInstrumentor().instrument(set_logging_format=True,log_level=logging.INFO)
@@ -83,7 +83,7 @@ def send_to_nr():
         pcontext = trace.set_span_in_context(p_parent)
         for job in job_lst:
             #Set job level tracer and logger
-            resource_attributes ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"instrumentation.name": "gitlab-integration","gitlab.source": "gitlab-exporter","gitlab.resource.type": "span"}
+            resource_attributes ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"instrumentation.name": "gitlab-integration","gitlab.source": "gitlab-exporter","gitlab.resource.type": "job"}
             if GLAB_LOW_DATA_MODE:
                 pass
             else:
@@ -136,7 +136,7 @@ def send_to_nr():
                                                 err = True
                                                 
                                     with open("job.log", "rb") as f:
-                                        resource_attributes_base ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"instrumentation.name": "gitlab-integration","gitlab.source": "gitlab-exporter","gitlab.resource.type": "span","stage.name":str(job_json['stage'])}
+                                        resource_attributes_base ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"instrumentation.name": "gitlab-integration","gitlab.source": "gitlab-exporter","gitlab.resource.type": "log","stage.name":str(job_json['stage'])}
                                         if err:
                                             count = 1
                                             for string in f:
