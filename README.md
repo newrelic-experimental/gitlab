@@ -71,7 +71,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:1.0.15
+    name: docker.io/dpacheconr/gitlab-exporter:1.0.16
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
