@@ -136,7 +136,7 @@ def send_to_nr():
                                                 err = True
                                                 
                                     with open("job.log", "rb") as f:
-                                        resource_attributes_base ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"instrumentation.name": "gitlab-integration","gitlab.source": "gitlab-exporter","gitlab.resource.type": "span","stage.name":str(job_json['stage'])}
+                                        resource_attributes_base ={SERVICE_NAME: GLAB_SERVICE_NAME,"pipeline_id": str(os.getenv('CI_PARENT_PIPELINE')),"project_id": str(os.getenv('CI_PROJECT_ID')),"job_id": str(job["id"]),"instrumentation.name": "gitlab-integration","gitlab.source": "gitlab-exporter","gitlab.resource.type": "span","stage.name":str(job['stage'])}
                                         if err:
                                             count = 1
                                             for string in f:
