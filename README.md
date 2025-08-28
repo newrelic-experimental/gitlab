@@ -43,6 +43,8 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 
 # New Relic Metrics Exporter
+## Child Pipeline and Bridge Tracing
+This exporter automatically traces and reports metrics for standard pipelines, child pipelines, and pipeline bridges (triggered downstream pipelines). For each pipeline, any bridges (child pipelines) are discovered and processed recursively, with full metrics and logs sent to New Relic.
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
 | `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
