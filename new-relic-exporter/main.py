@@ -26,18 +26,29 @@ def send_to_nr():
     try:
         jobs = pipeline.jobs.list(get_all=True)
         job_lst = []
-        # Ensure we don't export data for new relic exporters
+        # Parse excluded jobs from environment variable
+        exclude_jobs = []
+        if "GLAB_EXCLUDE_JOBS" in os.environ:
+            exclude_jobs = [
+                j.strip().lower()
+                for j in os.getenv("GLAB_EXCLUDE_JOBS", "").split(",")
+                if j.strip()
+            ]
+        # Ensure we don't export data for new relic exporters or excluded jobs
         for job in jobs:
             job_json = json.loads(job.to_json())
-            if str(job_json["stage"]).lower() not in [
-                "new-relic-exporter",
-                "new-relic-metrics-exporter",
-            ]:
+            job_stage = str(job_json["stage"]).lower()
+            job_name = str(job_json["name"]).lower()
+            if (
+                job_stage not in ["new-relic-exporter", "new-relic-metrics-exporter"]
+                and job_stage not in exclude_jobs
+                and job_name not in exclude_jobs
+            ):
                 job_lst.append(job_json)
 
         if len(job_lst) == 0:
             print(
-                "No data to export, assuming this pipeline jobs are new relic exporters"
+                "No data to export, assuming this pipeline jobs are new relic exporters or all jobs are excluded"
             )
             exit(0)
 

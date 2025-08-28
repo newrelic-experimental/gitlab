@@ -628,17 +628,30 @@ def get_jobs(pipelineobject, current_project, project_id, GLAB_SERVICE_NAME):
     current_pipeline = current_project.pipelines.get(pipelineobject.id)
     jobs = current_pipeline.jobs.list(get_all=True)
     current_pipeline_json = json.loads(current_pipeline.to_json())
+    # Parse excluded jobs from environment variable
+    exclude_jobs = []
+    if "GLAB_EXCLUDE_JOBS" in os.environ:
+        exclude_jobs = [
+            j.strip().lower()
+            for j in os.getenv("GLAB_EXCLUDE_JOBS", "").split(",")
+            if j.strip()
+        ]
     if len(jobs) > 0:
         # Collect job information
         for job in jobs:
-            # Ensure we don't export data for exporters jobs and only export jobs that have been created in the last GLAB_EXPORT_LAST_MINUTES minutes
             job_json = json.loads(job.to_json())
-            if (job_json["stage"]) not in [
-                "new-relic-exporter",
-                "new-relic-metrics-exporter",
-            ] and zulu.parse(job_json["created_at"]) >= (
-                datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
-                - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+            job_stage = str(job_json["stage"]).lower()
+            job_name = str(job_json["name"]).lower()
+            # Ensure we don't export data for exporters jobs, excluded jobs, and only export jobs created in the last GLAB_EXPORT_LAST_MINUTES minutes
+            if (
+                job_stage not in ["new-relic-exporter", "new-relic-metrics-exporter"]
+                and job_stage not in exclude_jobs
+                and job_name not in exclude_jobs
+                and zulu.parse(job_json["created_at"])
+                >= (
+                    datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                    - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+                )
             ):
                 q.put(
                     [
