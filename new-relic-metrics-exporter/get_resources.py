@@ -644,17 +644,9 @@ def get_jobs(pipelineobject, current_project, project_id, GLAB_SERVICE_NAME):
                 continue
             if job_name in exclude_jobs or job_stage in exclude_jobs:
                 continue
-            if zulu.parse(job_json["created_at"]) >= datetime.now(timezone.utc).replace(tzinfo=pytz.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)):
-                q.put([
-                    job_json,
-                    project_id,
-                    GLAB_SERVICE_NAME,
-                    "job",
-                    current_pipeline_json,
-                ])
-                datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
-                - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
-            ):
+            if zulu.parse(job_json["created_at"]) >= datetime.now(timezone.utc).replace(
+                tzinfo=pytz.utc
+            ) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)):
                 q.put(
                     [
                         job_json,
