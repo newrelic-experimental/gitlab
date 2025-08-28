@@ -24,9 +24,9 @@ def send_to_nr():
     )
 
     try:
-        jobs = pipeline.jobs.list(get_all=True)
+        bridges = pipeline.bridges.list(get_all=True)
         job_lst = []
-        # Exclude jobs by stage and by GLAB_EXCLUDE_JOBS env var
+        bridge_lst = []
         exclude_jobs = []
         if "GLAB_EXCLUDE_JOBS" in os.environ:
             exclude_jobs = [
@@ -34,6 +34,19 @@ def send_to_nr():
                 for j in os.getenv("GLAB_EXCLUDE_JOBS", "").split(",")
                 if j.strip()
             ]
+        # Process jobs
+    except Exception as e:
+        bridges = pipeline.bridges.list(get_all=True)
+        job_lst = []
+        bridge_lst = []
+        exclude_jobs = []
+        if "GLAB_EXCLUDE_JOBS" in os.environ:
+            exclude_jobs = [
+                j.strip().lower()
+                for j in os.getenv("GLAB_EXCLUDE_JOBS", "").split(",")
+                if j.strip()
+            ]
+        # Process jobs
         for job in jobs:
             job_json = json.loads(job.to_json())
             job_name = str(job_json.get("name", "")).lower()
@@ -43,26 +56,19 @@ def send_to_nr():
             if job_name in exclude_jobs or job_stage in exclude_jobs:
                 continue
             job_lst.append(job_json)
-        if len(job_lst) == 0:
-            print("No data to export, all jobs excluded or are exporters")
+        # Process bridges
+        for bridge in bridges:
+            bridge_json = json.loads(bridge.to_json())
+            bridge_name = str(bridge_json.get("name", "")).lower()
+            bridge_stage = str(bridge_json.get("stage", "")).lower()
+            if bridge_stage in ["new-relic-exporter", "new-relic-metrics-exporter"]:
+                continue
+            if bridge_name in exclude_jobs or bridge_stage in exclude_jobs:
+                continue
+            bridge_lst.append(bridge_json)
+        if len(job_lst) == 0 and len(bridge_lst) == 0:
+            print("No data to export, all jobs and bridges excluded or are exporters")
             exit(0)
-    except Exception as e:
-        print(e)
-
-    # Set variables to use for OTEL metrics and logs exporters
-    global_resource = Resource(
-        attributes={
-            SERVICE_NAME: GLAB_SERVICE_NAME,
-            "instrumentation.name": "gitlab-integration",
-            "pipeline_id": str(os.getenv("CI_PARENT_PIPELINE")),
-            "project_id": str(os.getenv("CI_PROJECT_ID")),
-            "gitlab.source": "gitlab-exporter",
-            "gitlab.resource.type": "span",
-        }
-    )
-
-    LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
-
     # Create global tracer to export traces to NR
     tracer = get_tracer(endpoint, headers, global_resource, "tracer")
 
