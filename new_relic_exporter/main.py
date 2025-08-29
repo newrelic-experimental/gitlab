@@ -2,7 +2,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 import json
 import logging
 import os
-from new_relic_exporter.custom_parsers import (
+from shared.custom_parsers import (
     do_parse,
     do_time,
     grab_span_att_vars,
@@ -10,11 +10,13 @@ from new_relic_exporter.custom_parsers import (
 )
 from opentelemetry import trace
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from new_relic_exporter.global_variables import *
+from shared.global_variables import *
 from opentelemetry.trace import Status, StatusCode
-from new_relic_exporter.otel import create_resource_attributes, get_logger, get_tracer
-from new_relic_exporter.global_variables import *
+from shared.otel import create_resource_attributes, get_logger, get_tracer
+from shared.global_variables import *
 import re
+
+LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
 
 
 def send_to_nr():

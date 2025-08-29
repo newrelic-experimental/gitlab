@@ -1,24 +1,17 @@
 services:
-  new_relic_exporter_base:
-    build:
-      context: ./new_relic_exporter_base
-    image: docker.io/dpacheconr/gitlab-exporter-base:latest
-    platform: linux/amd64
   new_relic_metrics_exporter:
     environment:
       - VERSION=$VERSION
-    depends_on:
-      - new_relic_exporter_base
     build:
-      context: ./new_relic_metrics_exporter
+      context: .
+      dockerfile: new_relic_metrics_exporter/Dockerfile
     image: docker.io/dpacheconr/gitlab-metrics-exporter:$VERSION
     platform: linux/amd64
   new_relic_exporter:
     environment:
       - VERSION=$VERSION
-    depends_on:
-      - new_relic_exporter_base
     build:
-      context: ./new_relic_exporter
+      context: .
+      dockerfile: new_relic_exporter/Dockerfile
     image: docker.io/dpacheconr/gitlab-exporter:$VERSION
     platform: linux/amd64

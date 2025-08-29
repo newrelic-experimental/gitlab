@@ -3,14 +3,12 @@ from datetime import datetime, timedelta, date, timezone
 import pytz
 import zulu
 from opentelemetry.sdk.resources import Resource
-from new_relic_exporter.otel import get_logger, create_resource_attributes
-from new_relic_exporter.custom_parsers import parse_attributes, parse_metrics_attributes
-from new_relic_exporter.otel import get_logger, get_meter, create_resource_attributes
-from new_relic_exporter.custom_parsers import parse_attributes
+from shared.otel import get_logger, create_resource_attributes, get_meter
+from shared.custom_parsers import parse_attributes, parse_metrics_attributes
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.sdk.resources import SERVICE_NAME
 import re
-from new_relic_exporter.global_variables import *
+from shared.global_variables import *
 import requests
 import logging
 import asyncio

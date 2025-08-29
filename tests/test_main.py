@@ -3,11 +3,9 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 # Patch check_env_vars, os.environ, and gl before importing main
-with patch(
-    "new_relic_exporter.custom_parsers.check_env_vars", lambda: None
-), patch.dict("os.environ", {"NEW_RELIC_API_KEY": "dummy_key"}), patch(
-    "new_relic_exporter.main.gl", MagicMock()
-):
+with patch("shared.custom_parsers.check_env_vars", lambda: None), patch.dict(
+    "os.environ", {"NEW_RELIC_API_KEY": "dummy_key"}
+), patch("new_relic_exporter.main.gl", MagicMock()):
     import new_relic_exporter.main as main
 
 

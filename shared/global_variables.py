@@ -1,5 +1,5 @@
 import os
-from new_relic_exporter.custom_parsers import check_env_vars
+from shared.custom_parsers import check_env_vars
 import gitlab
 from queue import Queue
 
