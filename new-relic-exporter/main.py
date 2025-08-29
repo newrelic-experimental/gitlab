@@ -23,6 +23,18 @@ def send_to_nr():
         str((project.attributes.get("name_with_namespace"))).lower().replace(" ", "")
     )
 
+    # Define global_resource for tracer
+    global_resource = Resource(
+        attributes={
+            SERVICE_NAME: GLAB_SERVICE_NAME,
+            "instrumentation.name": "gitlab-integration",
+            "pipeline_id": str(os.getenv("CI_PARENT_PIPELINE")),
+            "project_id": str(os.getenv("CI_PROJECT_ID")),
+            "gitlab.source": "gitlab-exporter",
+            "gitlab.resource.type": "span",
+        }
+    )
+
     try:
         bridges = pipeline.bridges.list(get_all=True)
         job_lst = []
@@ -36,6 +48,24 @@ def send_to_nr():
             ]
         # Process jobs
     except Exception as e:
+        bridges = pipeline.bridges.list(get_all=True)
+        job_lst = []
+        bridge_lst = []
+        exclude_jobs = []
+        if "GLAB_EXCLUDE_JOBS" in os.environ:
+            exclude_jobs = [
+                j.strip().lower()
+                for j in os.getenv("GLAB_EXCLUDE_JOBS", "").split(",")
+                if j.strip()
+            ]
+        # Process jobs
+        jobs = pipeline.jobs.list(get_all=True)
+        for job in jobs:
+            job_json = json.loads(job.to_json())
+            job_name = str(job_json.get("name", "")).lower()
+            job_stage = str(job_json.get("stage", "")).lower()
+        # Always process jobs and bridges
+        jobs = pipeline.jobs.list(get_all=True)
         bridges = pipeline.bridges.list(get_all=True)
         job_lst = []
         bridge_lst = []
@@ -69,45 +99,6 @@ def send_to_nr():
         if len(job_lst) == 0 and len(bridge_lst) == 0:
             print("No data to export, all jobs and bridges excluded or are exporters")
             exit(0)
-            # Define global_resource for tracer
-            global_resource = Resource(
-                attributes={
-                    SERVICE_NAME: GLAB_SERVICE_NAME,
-                    "instrumentation.name": "gitlab-integration",
-                    "pipeline_id": str(os.getenv("CI_PARENT_PIPELINE")),
-                    "project_id": str(os.getenv("CI_PROJECT_ID")),
-                    "gitlab.source": "gitlab-exporter",
-                    "gitlab.resource.type": "span",
-                }
-            )
-    # Create global tracer to export traces to NR
-    tracer = get_tracer(endpoint, headers, global_resource, "tracer")
-
-    # Configure env variables as span attributes
-    GLAB_LOW_DATA_MODE = False
-    # Check if we should run on low_data_mode
-    if (
-        "GLAB_LOW_DATA_MODE" in os.environ
-        and os.getenv("GLAB_LOW_DATA_MODE").lower() == "true"
-    ):
-        GLAB_LOW_DATA_MODE = True
-
-    if GLAB_LOW_DATA_MODE:
-        atts = {}
-    else:
-        atts = grab_span_att_vars()
-
-    # Configure spans
-    pipeline_json = json.loads(pipeline.to_json())
-
-    # Create a new root span(use start_span to manually end span with timestamp)
-    p_parent = tracer.start_span(
-        name=GLAB_SERVICE_NAME + " - pipeline: " + os.getenv("CI_PARENT_PIPELINE"),
-        attributes=atts,
-        start_time=do_time(str(pipeline_json["started_at"])),
-        kind=trace.SpanKind.SERVER,
-    )
-    try:
         if GLAB_LOW_DATA_MODE:
             pass
         else:
