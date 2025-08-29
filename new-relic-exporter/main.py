@@ -69,6 +69,17 @@ def send_to_nr():
         if len(job_lst) == 0 and len(bridge_lst) == 0:
             print("No data to export, all jobs and bridges excluded or are exporters")
             exit(0)
+            # Define global_resource for tracer
+            global_resource = Resource(
+                attributes={
+                    SERVICE_NAME: GLAB_SERVICE_NAME,
+                    "instrumentation.name": "gitlab-integration",
+                    "pipeline_id": str(os.getenv("CI_PARENT_PIPELINE")),
+                    "project_id": str(os.getenv("CI_PROJECT_ID")),
+                    "gitlab.source": "gitlab-exporter",
+                    "gitlab.resource.type": "span",
+                }
+            )
     # Create global tracer to export traces to NR
     tracer = get_tracer(endpoint, headers, global_resource, "tracer")
 
