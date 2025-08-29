@@ -1,13 +1,19 @@
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 import json
 import logging
 import os
-from custom_parsers import do_parse, do_time, grab_span_att_vars, parse_attributes
+from new_relic_exporter.custom_parsers import (
+    do_parse,
+    do_time,
+    grab_span_att_vars,
+    parse_attributes,
+)
 from opentelemetry import trace
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from new_relic_exporter.global_variables import *
 from opentelemetry.trace import Status, StatusCode
-from otel import create_resource_attributes, get_logger, get_tracer
-from global_variables import *
+from new_relic_exporter.otel import create_resource_attributes, get_logger, get_tracer
+from new_relic_exporter.global_variables import *
 import re
 
 
@@ -33,6 +39,33 @@ def send_to_nr():
             "gitlab.source": "gitlab-exporter",
             "gitlab.resource.type": "span",
         }
+    )
+
+    # Create global tracer to export traces to NR
+    tracer = get_tracer(endpoint, headers, global_resource, "tracer")
+
+    # Define pipeline_json
+    pipeline_json = json.loads(pipeline.to_json())
+
+    # Configure env variables as span attributes
+    GLAB_LOW_DATA_MODE = False
+    if (
+        "GLAB_LOW_DATA_MODE" in os.environ
+        and os.getenv("GLAB_LOW_DATA_MODE").lower() == "true"
+    ):
+        GLAB_LOW_DATA_MODE = True
+
+    if GLAB_LOW_DATA_MODE:
+        atts = {}
+    else:
+        atts = grab_span_att_vars()
+
+    # Create a new root span (use start_span to manually end span with timestamp)
+    p_parent = tracer.start_span(
+        name=GLAB_SERVICE_NAME + " - pipeline: " + os.getenv("CI_PARENT_PIPELINE"),
+        attributes=atts,
+        start_time=do_time(str(pipeline_json["started_at"])),
+        kind=trace.SpanKind.SERVER,
     )
 
     try:
@@ -343,4 +376,5 @@ def send_to_nr():
     gl.session.close()
 
 
-send_to_nr()
+if __name__ == "__main__":
+    send_to_nr()
