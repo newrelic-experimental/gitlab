@@ -2,7 +2,7 @@ services:
   new_relic_exporter_base:
     build:
       context: ./new_relic_exporter_base
-    image: docker.io/dpacheconr/gitlab_exporter_base:latest
+    image: docker.io/dpacheconr/gitlab-exporter-base:latest
     platform: linux/amd64
   new_relic_metrics_exporter:
     environment:
@@ -11,7 +11,7 @@ services:
       - new_relic_exporter_base
     build:
       context: ./new_relic_metrics_exporter
-    image: docker.io/dpacheconr/gitlab_metrics_exporter:$VERSION
+    image: docker.io/dpacheconr/gitlab-metrics-exporter:$VERSION
     platform: linux/amd64
   new_relic_exporter:
     environment:
@@ -20,5 +20,5 @@ services:
       - new_relic_exporter_base
     build:
       context: ./new_relic_exporter
-    image: docker.io/dpacheconr/gitlab_exporter:$VERSION
+    image: docker.io/dpacheconr/gitlab-exporter:$VERSION
     platform: linux/amd64
