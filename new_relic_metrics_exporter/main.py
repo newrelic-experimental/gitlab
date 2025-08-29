@@ -1,6 +1,6 @@
 import schedule
 import time
-from get_resources import grab_data, get_runners
+from new_relic_metrics_exporter.get_resources import grab_data, get_runners
 from shared.global_variables import *
 import asyncio
 import datetime
