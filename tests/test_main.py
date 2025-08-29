@@ -1,5 +1,3 @@
-
-
 import pytest
 
 from unittest.mock import patch, MagicMock
@@ -11,8 +9,6 @@ with patch(
     "new_relic_exporter.main.gl", MagicMock()
 ):
     import new_relic_exporter.main as main
-
-
 
 
 @patch("new_relic_exporter.main.gl")

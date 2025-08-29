@@ -32,14 +32,6 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics youâ€
 
 # New Relic Exporter
 
-## Running Tests
-
-To run the unit tests:
-
-```bash
-pytest -v tests/test_main.py
-```
-
 All tests should pass. There are no dummy tests included; all tests validate real functionality.
 
 | Variables | Description | Optional | Values | Default |
@@ -86,11 +78,19 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:1.0.16
+    name: docker.io/dpacheconr/gitlab-exporter:1.0.19
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
     - echo "Done"
+```
+
+## Running Tests
+
+To run the unit tests:
+
+```bash
+pytest -v tests/test_main.py
 ```
 
 ## New Relic Quickstart
