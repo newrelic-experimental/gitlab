@@ -40,22 +40,6 @@ This project uses a centralized configuration management system with type safety
 - **Health monitoring** and configuration validation
 - **Backward compatibility** with deprecation warnings for migration
 
-### Configuration Usage
-
-```python
-from shared.config.settings import get_config
-
-# Get the singleton configuration instance
-config = get_config()
-
-# Access configuration values
-gitlab_token = config.token
-new_relic_key = config.new_relic_api_key
-otel_endpoint = config.otel_endpoint
-```
-
-For detailed configuration documentation, see [CONFIGURATION_SYSTEM.md](examples/CONFIGURATION_SYSTEM.md).
-
 # New Relic Exporter
 
 All tests should pass. There are no dummy tests included; all tests validate real functionality.
@@ -104,7 +88,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:1.0.19
+    name: docker.io/dpacheconr/gitlab-exporter:2.0.0
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
@@ -117,17 +101,13 @@ image:
 
 The project uses pinned dependencies for reproducible builds:
 
-- **Production dependencies**: `shared/requirements.txt`
-- **Development dependencies**: `requirements-dev.txt`
+- **Dependencies**: `shared/requirements.txt`
 
 Install dependencies:
 
 ```bash
 # Production dependencies
 pip install -r shared/requirements.txt
-
-# Development dependencies (for testing and code quality)
-pip install -r requirements-dev.txt
 ```
 
 ### Running Tests
@@ -166,24 +146,6 @@ Run tests with coverage:
 python3 -m pytest tests/ --cov=shared --cov=new_relic_exporter --cov=new_relic_metrics_exporter --cov-report=html
 ```
 
-### Code Quality
-
-The project includes code quality tools:
-
-```bash
-# Code formatting
-black .
-
-# Linting
-flake8 .
-
-# Type checking
-mypy .
-
-# Security scanning
-bandit -r .
-```
-
 ## New Relic Quickstart
 > https://newrelic.com/instant-observability/gitlab
 
@@ -195,39 +157,6 @@ Alternative to running new relic metrics exporter as pipeline schedule:
 Rather than running in a GitLab pipeline the New Relic Metrics exporter can also  be run independently enabling standalone mode. To run in Docker for instance run the following:
  
 docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0
-
-## Recent Improvements
-
-### OpenTelemetry Attribute Filtering (Latest)
-- **Fixed critical OpenTelemetry warnings**: Eliminated "Invalid type NoneType for attribute" errors
-- **Comprehensive filtering across all processors**: Applied to job, pipeline, and bridge processors
-- **Robust None value handling**: Filters None values and empty strings before sending to OpenTelemetry
-- **Extensive test coverage**: Added 13 comprehensive tests covering all filtering scenarios
-- **Production stability**: Prevents exporter crashes in live GitLab environments
-
-### Configuration System Overhaul
-- Implemented centralized, type-safe configuration management
-- Added automatic New Relic region detection
-- Comprehensive validation and health monitoring
-- Backward compatibility with deprecation warnings
-
-### Dependencies Management
-- Fixed duplicate dependencies in requirements.txt
-- Added proper version pinning for reproducible builds
-- Separated development dependencies
-- Improved dependency categorization
-
-### Testing Infrastructure
-- Comprehensive test suite with 64+ tests
-- Configuration validation testing
-- Integration and performance testing
-- OpenTelemetry attribute filtering tests
-- 100% test pass rate
-
-For detailed information about recent improvements, see:
-- [CONFIGURATION_SYSTEM.md](examples/CONFIGURATION_SYSTEM.md)
-- [REQUIREMENTS_FIXES.md](examples/REQUIREMENTS_FIXES.md)
-- [IMPROVEMENT_PLAN.md](examples/IMPROVEMENT_PLAN.md)
 
 ## Contributing
 
