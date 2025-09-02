@@ -6,10 +6,11 @@ and focused, testable classes for pipeline, job, and bridge processing.
 """
 
 import logging
+from shared.otel.logging_filter import instrument_logging_with_filtering
 from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
 
-# Don't use OpenTelemetry logging instrumentation as it causes taskName None warnings
-# LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
+# Use filtered OpenTelemetry logging instrumentation to prevent taskName warnings
+instrument_logging_with_filtering(set_logging_format=True, log_level=logging.INFO)
 
 
 def main():
