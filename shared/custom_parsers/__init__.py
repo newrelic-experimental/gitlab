@@ -98,11 +98,27 @@ def grab_span_att_vars():
         for item in atts_to_remove:
             atts.pop(item, None)
 
-        # Filter out None values and empty strings to prevent OpenTelemetry warnings
+        # Filter out None values, empty strings, and problematic task-related attributes
+        problematic_attrs = {
+            "taskName",
+            "task_name",
+            "TASK_NAME",
+            "CICD_PIPELINE_TASK_NAME",
+            "CI_PIPELINE_TASK_NAME",
+            "CI_TASK_NAME",
+            "CI_JOB_TASK_NAME",
+            "GITLAB_TASK_NAME",
+            "PIPELINE_TASK_NAME",
+            "JOB_TASK_NAME",
+        }
+
         filtered_atts = {
             key: value
             for key, value in atts.items()
-            if value is not None and value != ""
+            if value is not None
+            and value != ""
+            and value != "None"
+            and key not in problematic_attrs
         }
 
     except Exception as e:
@@ -291,11 +307,28 @@ def parse_attributes(obj):
                             else:
                                 obj_atts[attribute_name] = str(obj[attribute])
 
-    # Final filter to ensure no None values or empty strings slip through
+    # Final filter to ensure no None values, empty strings, or problematic attributes slip through
+    problematic_attrs = {
+        "taskname",
+        "task_name",
+        "taskName",
+        "TASK_NAME",
+        "cicd_pipeline_task_name",
+        "ci_pipeline_task_name",
+        "ci_task_name",
+        "ci_job_task_name",
+        "gitlab_task_name",
+        "pipeline_task_name",
+        "job_task_name",
+    }
+
     filtered_obj_atts = {
         key: value
         for key, value in obj_atts.items()
-        if value is not None and value != "" and value != "None"
+        if value is not None
+        and value != ""
+        and value != "None"
+        and key not in problematic_attrs
     }
 
     return filtered_obj_atts
