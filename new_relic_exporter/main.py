@@ -6,17 +6,10 @@ and focused, testable classes for pipeline, job, and bridge processing.
 """
 
 import logging
-import os
-from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from opentelemetry.sdk.resources import Resource
 from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
 
-# Disable automatic resource detection that causes taskName None values
-os.environ["OTEL_RESOURCE_ATTRIBUTES"] = "service.name=gitlab-exporter"
-os.environ["OTEL_RESOURCE_DETECTORS"] = ""
-
-# Configure logging instrumentation
-LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
+# Don't use OpenTelemetry logging instrumentation as it causes taskName None warnings
+# LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
 
 
 def main():

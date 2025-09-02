@@ -16,7 +16,8 @@ import time
 import concurrent.futures
 from concurrent.futures import wait
 
-LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
+# Don't use OpenTelemetry logging instrumentation as it causes taskName None warnings
+# LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
 
 # Global settings for logger,tracer,meter
 global_resource_attributes = {
