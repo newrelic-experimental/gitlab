@@ -9,3 +9,6 @@ __pycache__/
 dist/
 build/
 .vscode/
+.env
+.env-example
+examples/

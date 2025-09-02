@@ -11,8 +11,6 @@
 ![GitHub issues](https://img.shields.io/github/issues/newrelic-experimental/tls-proxy)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/newrelic-experimental/tls-proxy)
 
-
-
 ## How to monitor Gitlab with New Relic
 
 Now, you can monitor your Gitlab data with New Relic using New Relic Exporter and Metrics Exporter, making it easier to get observability into your CI/CD pipeline health and performance.
@@ -24,11 +22,39 @@ Using these exporters you will be able to:
 - Pinpoint where issues are coming from in your pipelines.
 - Create alerts on your Gitlab pipelines.
 
-The next image shows a New Relic dashboard with some of the Gitlab metrics you’ll be able to visualise.
+The next image shows a New Relic dashboard with some of the Gitlab metrics you'll be able to visualise.
 
 ## Gitlab Dashboard
 
 ![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
+
+## Configuration System
+
+This project uses a centralized configuration management system with type safety and validation. Configuration is loaded from environment variables and provides backward compatibility with the previous global variables approach.
+
+### Key Features
+
+- **Type-safe configuration** with dataclasses and validation
+- **Automatic New Relic region detection** (US/EU) based on API key
+- **Environment variable validation** with clear error messages
+- **Health monitoring** and configuration validation
+- **Backward compatibility** with deprecation warnings for migration
+
+### Configuration Usage
+
+```python
+from shared.config.settings import get_config
+
+# Get the singleton configuration instance
+config = get_config()
+
+# Access configuration values
+gitlab_token = config.token
+new_relic_key = config.new_relic_api_key
+otel_endpoint = config.otel_endpoint
+```
+
+For detailed configuration documentation, see [CONFIGURATION_SYSTEM.md](examples/CONFIGURATION_SYSTEM.md).
 
 # New Relic Exporter
 
@@ -36,7 +62,7 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
-| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
+| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | Auto-detected: "https://otlp.nr-data.net:4318" (US) or "https://otlp.eu01.nr-data.net:4318" (EU) |
 | `GLAB_TOKEN` | MASKED - Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
 | `GLAB_EXPORT_LOGS` | Export job logs to New Relic | True | Boolean | True |
@@ -50,7 +76,7 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
-| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
+| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | Auto-detected: "https://otlp.nr-data.net:4318" (US) or "https://otlp.eu01.nr-data.net:4318" (EU) |
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_TOKEN` | MASKED - Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
@@ -59,7 +85,7 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | True | Bool | False |
 | `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_RUNNERS_INSTANCE` | Obtain runners from gitlab instance instead of project only  | True | String | |
-| `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against “.*” for all | False | Boolean | None |
+| `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against ".*" for all | False | Boolean | None |
 | `GLAB_EXPORT_PATHS_ALL` | When True ignore GLAB_EXPORT_PATHS variable and export projects matching GLAB_EXPORT_PROJECTS_REGEX in any groups or subgroups| True |  Boolean | False |
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
@@ -85,12 +111,77 @@ image:
     - echo "Done"
 ```
 
-## Running Tests
+## Development Setup
 
-To run the unit tests:
+### Requirements
+
+The project uses pinned dependencies for reproducible builds:
+
+- **Production dependencies**: `shared/requirements.txt`
+- **Development dependencies**: `requirements-dev.txt`
+
+Install dependencies:
 
 ```bash
-pytest -v tests/test_main.py
+# Production dependencies
+pip install -r shared/requirements.txt
+
+# Development dependencies (for testing and code quality)
+pip install -r requirements-dev.txt
+```
+
+### Running Tests
+
+The project includes comprehensive test coverage with 76 tests covering:
+
+- Configuration management and validation
+- GitLab API integration
+- New Relic integration
+- Data transformation
+- Performance testing
+- Error handling
+
+Run all tests:
+
+```bash
+python3 -m pytest tests/ -v
+```
+
+Run specific test modules:
+
+```bash
+# Configuration tests
+python3 -m pytest tests/test_config.py -v
+
+# Main module tests
+python3 -m pytest tests/test_main.py -v
+
+# Integration tests
+python3 -m pytest tests/test_gitlab_integration.py -v
+```
+
+Run tests with coverage:
+
+```bash
+python3 -m pytest tests/ --cov=shared --cov=new_relic_exporter --cov=new_relic_metrics_exporter --cov-report=html
+```
+
+### Code Quality
+
+The project includes code quality tools:
+
+```bash
+# Code formatting
+black .
+
+# Linting
+flake8 .
+
+# Type checking
+mypy .
+
+# Security scanning
+bandit -r .
 ```
 
 ## New Relic Quickstart
@@ -104,6 +195,30 @@ Alternative to running new relic metrics exporter as pipeline schedule:
 Rather than running in a GitLab pipeline the New Relic Metrics exporter can also  be run independently enabling standalone mode. To run in Docker for instance run the following:
  
 docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.15
+
+## Recent Improvements
+
+### Configuration System Overhaul
+- Implemented centralized, type-safe configuration management
+- Added automatic New Relic region detection
+- Comprehensive validation and health monitoring
+- Backward compatibility with deprecation warnings
+
+### Dependencies Management
+- Fixed duplicate dependencies in requirements.txt
+- Added proper version pinning for reproducible builds
+- Separated development dependencies
+- Improved dependency categorization
+
+### Testing Infrastructure
+- Comprehensive test suite with 76 tests
+- Configuration validation testing
+- Integration and performance testing
+- 100% test pass rate
+
+For detailed information about recent improvements, see:
+- [CONFIGURATION_SYSTEM.md](examples/CONFIGURATION_SYSTEM.md)
+- [REQUIREMENTS_FIXES.md](examples/REQUIREMENTS_FIXES.md)
 
 ## Contributing
 

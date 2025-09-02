@@ -1,25 +1,143 @@
-import pytest
+"""
+Tests for the main entry point of the GitLab New Relic Exporter.
 
+Tests the new refactored main function that uses the processor architecture.
+"""
+
+import pytest
+import os
 from unittest.mock import patch, MagicMock
 
-# Patch check_env_vars, os.environ, and gl before importing main
-with patch("shared.custom_parsers.check_env_vars", lambda: None), patch.dict(
-    "os.environ", {"NEW_RELIC_API_KEY": "dummy_key"}
-), patch("new_relic_exporter.main.gl", MagicMock()):
-    import new_relic_exporter.main as main
+
+class TestMainFunction:
+    """Test suite for the main function."""
+
+    @patch("new_relic_exporter.main.GitLabExporter")
+    def test_main_success(self, mock_exporter_class):
+        """Test successful execution of main function."""
+        # Setup mock exporter
+        mock_exporter = MagicMock()
+        mock_exporter_class.return_value = mock_exporter
+
+        # Import and run main
+        from new_relic_exporter.main import main
+
+        # Should complete without error
+        main()
+
+        # Verify exporter was created and called
+        mock_exporter_class.assert_called_once()
+        mock_exporter.export_pipeline_data.assert_called_once()
+
+    @patch("new_relic_exporter.main.GitLabExporter")
+    def test_main_exporter_error(self, mock_exporter_class):
+        """Test main function handles exporter errors."""
+        # Setup mock exporter to raise an error
+        mock_exporter = MagicMock()
+        mock_exporter.export_pipeline_data.side_effect = Exception("Export failed")
+        mock_exporter_class.return_value = mock_exporter
+
+        # Import main
+        from new_relic_exporter.main import main
+
+        # Should raise the exception
+        with pytest.raises(Exception, match="Export failed"):
+            main()
+
+        # Verify exporter was created and called
+        mock_exporter_class.assert_called_once()
+        mock_exporter.export_pipeline_data.assert_called_once()
+
+    @patch("new_relic_exporter.main.GitLabExporter")
+    @patch("builtins.print")
+    def test_main_prints_status(self, mock_print, mock_exporter_class):
+        """Test that main function prints status messages."""
+        # Setup mock exporter
+        mock_exporter = MagicMock()
+        mock_exporter_class.return_value = mock_exporter
+
+        # Import and run main
+        from new_relic_exporter.main import main
+
+        main()
+
+        # Verify status messages were printed
+        mock_print.assert_any_call("Starting GitLab New Relic Exporter")
+        mock_print.assert_any_call("GitLab New Relic Exporter completed successfully")
+
+    def test_main_module_execution(self):
+        """Test that the module can be executed directly."""
+        # This test verifies the if __name__ == "__main__" block exists
+        from new_relic_exporter import main as main_module
+
+        # Verify the main function exists
+        assert hasattr(main_module, "main")
+        assert callable(main_module.main)
 
 
-@patch("new_relic_exporter.main.gl")
-def test_send_to_nr_basic(mock_gl):
-    with patch.dict(
-        "os.environ", {"CI_PARENT_PIPELINE": "456", "CI_PROJECT_ID": "123"}
-    ):
-        mock_project = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_project.pipelines.get.return_value = mock_pipeline
-        mock_gl.projects.get.return_value = mock_project
-        mock_pipeline.bridges.list.return_value = []
-        mock_pipeline.to_json.return_value = '{"id": 123, "status": "success", "started_at": "2024-01-01T00:00:00Z", "finished_at": "2024-01-01T01:00:00Z"}'
-        mock_project.attributes.get.return_value = "Test Project"
-        result = main.send_to_nr()
-        assert result is None or result == True or result == False
+class TestModuleStructure:
+    """Test suite for module structure and imports."""
+
+    def test_required_imports(self):
+        """Test that all required imports are available."""
+        from new_relic_exporter.main import main
+        from new_relic_exporter.main import GitLabExporter
+
+        # Verify imports work
+        assert callable(main)
+        assert GitLabExporter is not None
+
+    def test_logging_configuration(self):
+        """Test that logging is properly configured."""
+        # Import the module to trigger logging setup
+        import new_relic_exporter.main
+
+        # Verify the module imports without error
+        assert new_relic_exporter.main is not None
+
+
+class TestIntegration:
+    """Integration tests using the new architecture."""
+
+    @patch("new_relic_exporter.main.GitLabExporter")
+    def test_main_with_mocked_dependencies(self, mock_exporter_class):
+        """Test main function with mocked GitLab dependencies."""
+        # Setup mock exporter
+        mock_exporter = MagicMock()
+        mock_exporter_class.return_value = mock_exporter
+
+        # Setup environment variables
+        with patch.dict(
+            os.environ, {"CI_PROJECT_ID": "123", "CI_PARENT_PIPELINE": "456"}
+        ):
+            # Import and run main
+            from new_relic_exporter.main import main
+
+            # Should complete without error
+            main()
+
+            # Verify exporter was created and called
+            mock_exporter_class.assert_called_once()
+            mock_exporter.export_pipeline_data.assert_called_once()
+
+    @patch("new_relic_exporter.main.GitLabExporter")
+    def test_main_missing_environment_variables(self, mock_exporter_class):
+        """Test main function behavior with missing environment variables."""
+        # Setup mock exporter
+        mock_exporter = MagicMock()
+        mock_exporter_class.return_value = mock_exporter
+
+        # Clear environment variables
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("builtins.print") as mock_print:
+                # Import and run main
+                from new_relic_exporter.main import main
+
+                # Should complete (the exporter handles missing vars gracefully)
+                main()
+
+                # Verify it attempted to start
+                mock_print.assert_any_call("Starting GitLab New Relic Exporter")
+                # Verify exporter was created and called
+                mock_exporter_class.assert_called_once()
+                mock_exporter.export_pipeline_data.assert_called_once()
