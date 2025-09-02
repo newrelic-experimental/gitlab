@@ -12,3 +12,6 @@ build/
 .env
 .env-example
 examples/
+job.log
+.coverage
+

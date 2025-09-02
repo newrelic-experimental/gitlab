@@ -208,7 +208,14 @@ class JobProcessor(BaseProcessor):
 
                 # Set job attributes if not in low data mode
                 if not self.config.low_data_mode:
-                    child.set_attributes(parse_attributes(job))
+                    job_attributes = parse_attributes(job)
+                    # Filter out None values to prevent OpenTelemetry warnings
+                    filtered_attributes = {
+                        key: value
+                        for key, value in job_attributes.items()
+                        if value is not None
+                    }
+                    child.set_attributes(filtered_attributes)
 
                 # Handle job logs if enabled
                 if self.config.export_logs:

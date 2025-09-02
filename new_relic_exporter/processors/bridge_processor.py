@@ -145,7 +145,14 @@ class BridgeProcessor(BaseProcessor):
             with trace.use_span(child, end_on_exit=False):
                 # Set bridge attributes if not in low data mode
                 if not self.config.low_data_mode:
-                    child.set_attributes(parse_attributes(bridge_data))
+                    bridge_attributes = parse_attributes(bridge_data)
+                    # Filter out None values to prevent OpenTelemetry warnings
+                    filtered_attributes = {
+                        key: value
+                        for key, value in bridge_attributes.items()
+                        if value is not None
+                    }
+                    child.set_attributes(filtered_attributes)
 
                 # Add downstream pipeline information if available
                 downstream_info = self.get_bridge_downstream_info(bridge_data)

@@ -126,7 +126,13 @@ class PipelineProcessor(BaseProcessor):
         if not self.config.low_data_mode:
             pipeline_attributes = parse_attributes(self.pipeline_json)
             pipeline_attributes.update(atts)
-            pipeline_span.set_attributes(pipeline_attributes)
+            # Filter out None values to prevent OpenTelemetry warnings
+            filtered_attributes = {
+                key: value
+                for key, value in pipeline_attributes.items()
+                if value is not None
+            }
+            pipeline_span.set_attributes(filtered_attributes)
 
         # Set error status if pipeline failed
         if self.pipeline_json["status"] == "failed":
