@@ -16,8 +16,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 def create_resource_attributes(atts, GLAB_SERVICE_NAME):
     attributes = {SERVICE_NAME: GLAB_SERVICE_NAME}
     for att in atts:
-        # Filter out None values to prevent OpenTelemetry warnings
-        if atts[att] is not None:
+        # Filter out None values and empty strings to prevent OpenTelemetry warnings
+        if atts[att] is not None and atts[att] != "":
             if att != "name":
                 attributes[att] = atts[att]
             else:

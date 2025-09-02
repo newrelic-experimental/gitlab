@@ -290,7 +290,15 @@ def parse_attributes(obj):
                                     obj_atts[attribute_name] = str(obj[attribute])
                             else:
                                 obj_atts[attribute_name] = str(obj[attribute])
-    return obj_atts
+
+    # Final filter to ensure no None values or empty strings slip through
+    filtered_obj_atts = {
+        key: value
+        for key, value in obj_atts.items()
+        if value is not None and value != "" and value != "None"
+    }
+
+    return filtered_obj_atts
 
 
 def parse_metrics_attributes(attributes):
