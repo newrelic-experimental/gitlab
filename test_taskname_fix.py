@@ -24,7 +24,7 @@ def test_taskname_filtering():
     print("1. Applying OpenTelemetry filtering patches...")
     instrument_logging_with_filtering(set_logging_format=True, log_level=logging.INFO)
     patch_span_creation()
-    print("   ✓ Logging instrumentation disabled")
+    print("   ✓ Logging instrumentation enabled with filtering")
     print("   ✓ Span filtering patch applied")
 
     # Test with problematic data that would normally cause warnings
