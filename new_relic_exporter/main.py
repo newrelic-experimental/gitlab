@@ -6,8 +6,18 @@ and focused, testable classes for pipeline, job, and bridge processing.
 """
 
 import logging
+import os
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
+
+# Set environment variables to prevent OpenTelemetry from adding None values
+# for CICD attributes that it tries to auto-detect
+if not os.getenv("TASK_NAME"):
+    os.environ["TASK_NAME"] = "gitlab-exporter"
+
+# Also set other potential CICD environment variables that OpenTelemetry might try to detect
+if not os.getenv("CICD_PIPELINE_TASK_NAME"):
+    os.environ["CICD_PIPELINE_TASK_NAME"] = "gitlab-exporter"
 
 # Configure logging instrumentation
 LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)

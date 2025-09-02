@@ -117,12 +117,6 @@ class JobProcessor(BaseProcessor):
                             if value is not None and value != ""
                         }
 
-                        # Debug: Print the attributes being passed to Resource
-                        print(f"DEBUG: Resource attributes before filtering: {attrs}")
-                        print(
-                            f"DEBUG: Resource attributes after filtering: {filtered_attrs}"
-                        )
-
                         resource_log = Resource(attributes=filtered_attrs)
                         job_logger = get_logger(
                             endpoint, headers, resource_log, "job_logger"
