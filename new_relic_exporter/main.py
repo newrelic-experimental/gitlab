@@ -7,10 +7,12 @@ and focused, testable classes for pipeline, job, and bridge processing.
 
 import logging
 from shared.otel.logging_filter import instrument_logging_with_filtering
+from shared.otel.span_filter import patch_span_creation
 from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
 
-# Apply OpenTelemetry logging instrumentation
+# Apply OpenTelemetry filtering to prevent taskName warnings
 instrument_logging_with_filtering(set_logging_format=True, log_level=logging.INFO)
+patch_span_creation()
 
 
 def main():

@@ -6,6 +6,7 @@ from opentelemetry.sdk.resources import Resource
 from shared.otel import get_logger, create_resource_attributes, get_meter
 from shared.custom_parsers import parse_attributes, parse_metrics_attributes
 from shared.otel.logging_filter import instrument_logging_with_filtering
+from shared.otel.span_filter import patch_span_creation
 from opentelemetry.sdk.resources import SERVICE_NAME
 import re
 from shared.global_variables import *
@@ -16,8 +17,9 @@ import time
 import concurrent.futures
 from concurrent.futures import wait
 
-# Use filtered OpenTelemetry logging instrumentation to prevent taskName warnings
+# Use filtered OpenTelemetry instrumentation to prevent taskName warnings
 instrument_logging_with_filtering(set_logging_format=True, log_level=logging.INFO)
+patch_span_creation()
 
 # Global settings for logger,tracer,meter
 global_resource_attributes = {
