@@ -62,7 +62,14 @@ class JobProcessor(BaseProcessor):
                 create_resource_attributes(job_attributes, service_name)
             )
 
-        return Resource(attributes=resource_attributes)
+        # Filter out None values and empty strings to prevent OpenTelemetry warnings
+        filtered_resource_attributes = {
+            key: value
+            for key, value in resource_attributes.items()
+            if value is not None and value != ""
+        }
+
+        return Resource(attributes=filtered_resource_attributes)
 
     def handle_job_logs(
         self,
@@ -103,7 +110,13 @@ class JobProcessor(BaseProcessor):
                     if string.decode("utf-8") != "\n" and len(txt) > 2:
                         attrs = resource_attributes.copy()
                         attrs["log"] = txt
-                        resource_log = Resource(attributes=attrs)
+                        # Filter out None values and empty strings to prevent OpenTelemetry warnings
+                        filtered_attrs = {
+                            key: value
+                            for key, value in attrs.items()
+                            if value is not None and value != ""
+                        }
+                        resource_log = Resource(attributes=filtered_attrs)
                         job_logger = get_logger(
                             endpoint, headers, resource_log, "job_logger"
                         )
