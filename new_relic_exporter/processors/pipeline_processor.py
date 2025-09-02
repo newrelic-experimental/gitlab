@@ -56,7 +56,15 @@ class PipelineProcessor(BaseProcessor):
             "gitlab.source": "gitlab-exporter",
             "gitlab.resource.type": "span",
         }
-        return Resource(attributes=attributes)
+
+        # Filter out None values and empty strings to prevent OpenTelemetry warnings
+        filtered_attributes = {
+            key: value
+            for key, value in attributes.items()
+            if value is not None and value != ""
+        }
+
+        return Resource(attributes=filtered_attributes)
 
     def get_filtered_jobs_and_bridges(
         self, exclude_jobs: List[str]
@@ -126,11 +134,11 @@ class PipelineProcessor(BaseProcessor):
         if not self.config.low_data_mode:
             pipeline_attributes = parse_attributes(self.pipeline_json)
             pipeline_attributes.update(atts)
-            # Filter out None values to prevent OpenTelemetry warnings
+            # Filter out None values and empty strings to prevent OpenTelemetry warnings
             filtered_attributes = {
                 key: value
                 for key, value in pipeline_attributes.items()
-                if value is not None
+                if value is not None and value != ""
             }
             pipeline_span.set_attributes(filtered_attributes)
 

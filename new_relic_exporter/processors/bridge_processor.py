@@ -64,7 +64,14 @@ class BridgeProcessor(BaseProcessor):
             bridge_attributes = parse_attributes(bridge_data)
             base_attributes.update(bridge_attributes)
 
-        resource_attributes = self.create_resource_attributes(base_attributes)
+        # Filter out None values and empty strings to prevent OpenTelemetry warnings
+        filtered_base_attributes = {
+            key: value
+            for key, value in base_attributes.items()
+            if value is not None and value != ""
+        }
+
+        resource_attributes = self.create_resource_attributes(filtered_base_attributes)
         return Resource(attributes=resource_attributes)
 
     def get_bridge_downstream_info(
@@ -146,18 +153,24 @@ class BridgeProcessor(BaseProcessor):
                 # Set bridge attributes if not in low data mode
                 if not self.config.low_data_mode:
                     bridge_attributes = parse_attributes(bridge_data)
-                    # Filter out None values to prevent OpenTelemetry warnings
+                    # Filter out None values and empty strings to prevent OpenTelemetry warnings
                     filtered_attributes = {
                         key: value
                         for key, value in bridge_attributes.items()
-                        if value is not None
+                        if value is not None and value != ""
                     }
                     child.set_attributes(filtered_attributes)
 
                 # Add downstream pipeline information if available
                 downstream_info = self.get_bridge_downstream_info(bridge_data)
                 if downstream_info:
-                    child.set_attributes(downstream_info)
+                    # Filter downstream info as well
+                    filtered_downstream_info = {
+                        key: value
+                        for key, value in downstream_info.items()
+                        if value is not None and value != ""
+                    }
+                    child.set_attributes(filtered_downstream_info)
 
                 # Handle failed bridges
                 if bridge_data["status"] == "failed":
