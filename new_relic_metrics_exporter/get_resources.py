@@ -35,6 +35,8 @@ global_resource = Resource(attributes=global_resource_attributes)
 # Global logger
 global_logger = get_logger(endpoint, headers, global_resource, "global_logger")
 
+# Structured logger for this module
+structured_logger = get_structured_logger("gitlab-metrics-exporter", "get-resources")
 
 # Global meter
 global_meter = get_meter(endpoint, headers, global_resource, "global_meter")
@@ -71,10 +73,15 @@ def get_runners():
                     runners.extend(gl.runners.list(scope=scope, get_all=True))
 
             if len(runners) == 0:
-                print(
-                    "Number of runners found available to this user is",
-                    len(runners),
-                    "not exporting any runner data",
+                context = LogContext(
+                    service_name="gitlab-metrics-exporter",
+                    component="get-resources",
+                    operation="get_runners",
+                )
+                structured_logger.info(
+                    "No runners found available to this user, not exporting any runner data",
+                    context,
+                    runner_count=len(runners),
                 )
             else:
                 for runner in runners:
@@ -88,10 +95,21 @@ def get_runners():
                     global_logger._log(
                         level=logging.INFO, msg=msg, extra=runner_attributes, args=""
                     )
-                    print("Log events sent for runner: " + str(runner_json["id"]))
+                    context = LogContext(
+                        service_name="gitlab-metrics-exporter",
+                        component="get-resources",
+                        operation="get_runners",
+                        runner_id=str(runner_json["id"]),
+                    )
+                    structured_logger.info("Log events sent for runner", context)
 
     except Exception as e:
-        print("Unable to obtain runners due to ", str(e))
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="get_runners",
+        )
+        structured_logger.error("Unable to obtain runners", context, exception=e)
 
 
 async def grab_data(project):
