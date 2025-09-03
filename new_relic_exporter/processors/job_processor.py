@@ -110,22 +110,11 @@ class JobProcessor(BaseProcessor):
                     if string.decode("utf-8") != "\n" and len(txt) > 2:
                         attrs = resource_attributes.copy()
                         attrs["log"] = txt
-                        # Filter out None values, empty strings, and problematic CICD attributes
-                        problematic_attrs = [
-                            "TASK_NAME",
-                            "CICD_PIPELINE_TASK_NAME",
-                            "CI_PIPELINE_TASK_NAME",
-                            "taskName",
-                            "task_name",
-                        ]
-
+                        # Filter out None values and empty strings
                         filtered_attrs = {
                             key: value
                             for key, value in attrs.items()
-                            if value is not None
-                            and value != ""
-                            and value != "None"
-                            and key not in problematic_attrs
+                            if value is not None and value != "" and value != "None"
                         }
 
                         resource_log = Resource(attributes=filtered_attrs)
@@ -234,23 +223,7 @@ class JobProcessor(BaseProcessor):
                 # Set job attributes if not in low data mode
                 if not self.config.low_data_mode:
                     job_attributes = parse_attributes(job)
-                    # Filter out None values and problematic attributes to prevent OpenTelemetry warnings
-                    problematic_attrs = [
-                        "taskName",
-                        "task_name",
-                        "TASK_NAME",
-                        "CICD_PIPELINE_TASK_NAME",
-                        "CI_PIPELINE_TASK_NAME",
-                    ]
-                    filtered_attributes = {
-                        key: value
-                        for key, value in job_attributes.items()
-                        if value is not None
-                        and value != ""
-                        and value != "None"
-                        and key not in problematic_attrs
-                    }
-                    child.set_attributes(filtered_attributes)
+                    child.set_attributes(job_attributes)
 
                 # Handle job logs if enabled
                 if self.config.export_logs:

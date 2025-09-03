@@ -98,27 +98,11 @@ def grab_span_att_vars():
         for item in atts_to_remove:
             atts.pop(item, None)
 
-        # Filter out None values, empty strings, and problematic task-related attributes
-        problematic_attrs = {
-            "taskName",
-            "task_name",
-            "TASK_NAME",
-            "CICD_PIPELINE_TASK_NAME",
-            "CI_PIPELINE_TASK_NAME",
-            "CI_TASK_NAME",
-            "CI_JOB_TASK_NAME",
-            "GITLAB_TASK_NAME",
-            "PIPELINE_TASK_NAME",
-            "JOB_TASK_NAME",
-        }
-
+        # Filter out None values and empty strings
         filtered_atts = {
             key: value
             for key, value in atts.items()
-            if value is not None
-            and value != ""
-            and value != "None"
-            and key not in problematic_attrs
+            if value is not None and value != "" and value != "None"
         }
 
     except Exception as e:
