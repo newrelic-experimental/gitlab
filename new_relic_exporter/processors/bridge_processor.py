@@ -188,12 +188,7 @@ class BridgeProcessor(BaseProcessor):
                             Status(StatusCode.ERROR, "Downstream pipeline failed")
                         )
                     elif downstream_status in ["success", "passed"]:
-                        child.set_status(
-                            Status(
-                                StatusCode.OK,
-                                "Bridge and downstream pipeline succeeded",
-                            )
-                        )
+                        child.set_status(Status(StatusCode.OK))
 
                 # End the span with finish time if available
                 end_time = None
