@@ -4,7 +4,7 @@ import pytz
 import zulu
 from opentelemetry.sdk.resources import Resource
 from shared.otel import get_logger, create_resource_attributes, get_meter
-from shared.custom_parsers import parse_attributes, parse_metrics_attributes
+from shared.custom_parsers import parse_attributes, parse_metrics_attributes, do_parse
 from shared.otel.logging_filter import instrument_logging_with_filtering
 from shared.otel.span_filter import patch_span_creation
 from opentelemetry.sdk.resources import SERVICE_NAME
@@ -287,11 +287,11 @@ def get_dora_metrics(current_project):
     for metric in metrics:
         r = requests.get(metrics[metric], headers=req_headers)
         dora = meter.create_counter("gitlab_dora_" + str(metric))
-        if r.status_code == 200 and len(r.text) > 2:
+        if r.status_code == 200 and do_parse(r.text):
             # Create metrics we want to populate
             res = json.loads(r.text)
             for i in range(len(res)):
-                if res[i]["value"] is not None:
+                if do_parse(res[i]["value"]):
                     if metric == "change_failure_rate":
                         dora.add(
                             res[i]["value"] * 100,
