@@ -127,12 +127,18 @@ async def grab_data(project):
         ):
             if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
                 try:
-                    print(
-                        "Project: "
-                        + str((project.attributes.get("name_with_namespace")))
+                    context = LogContext(
+                        service_name="gitlab-metrics-exporter",
+                        component="get-resources",
+                        operation="grab_data",
+                        project_name=str(
+                            (project.attributes.get("name_with_namespace"))
+                        )
                         .lower()
-                        .replace(" ", "")
-                        + " matched configuration, collecting data..."
+                        .replace(" ", ""),
+                    )
+                    structured_logger.info(
+                        "Project matched configuration, collecting data", context
                     )
                     project_id = json.loads(project.to_json())["id"]
                     GLAB_SERVICE_NAME = (
@@ -168,20 +174,39 @@ async def grab_data(project):
                             # To bypass issues with overloading global logger with too much data
                             time.sleep(0.05)
                 except Exception as e:
-                    print(
-                        str(e)
-                        + " -> Failed to collect data for project:  "
-                        + str((project.attributes.get("name_with_namespace")))
+                    context = LogContext(
+                        service_name="gitlab-metrics-exporter",
+                        component="get-resources",
+                        operation="grab_data",
+                        project_name=str(
+                            (project.attributes.get("name_with_namespace"))
+                        )
                         .lower()
-                        .replace(" ", "")
-                        + " check your configuration.",
-                        project_json,
+                        .replace(" ", ""),
+                    )
+                    structured_logger.error(
+                        "Failed to collect data for project, check your configuration",
+                        context,
+                        exception=e,
+                        project_json=project_json,
                     )
                 if GLAB_DORA_METRICS:
                     try:
                         get_dora_metrics(project)
                     except Exception as e:
-                        print("Unable to obtain DORA metrics ", e)
+                        context = LogContext(
+                            service_name="gitlab-metrics-exporter",
+                            component="get-resources",
+                            operation="get_dora_metrics",
+                            project_name=str(
+                                (project.attributes.get("name_with_namespace"))
+                            )
+                            .lower()
+                            .replace(" ", ""),
+                        )
+                        structured_logger.error(
+                            "Unable to obtain DORA metrics", context, exception=e
+                        )
                 # If we don't need to export all projects each time
                 if zulu.parse(project_json["last_activity_at"]) >= (
                     datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
@@ -201,12 +226,14 @@ async def grab_data(project):
                     global_logger._log(
                         level=logging.INFO, msg=msg, extra=c_attributes, args=""
                     )
-                    print(
-                        "Log events sent for project: "
-                        + str(project_json["id"])
-                        + " - "
-                        + str(GLAB_SERVICE_NAME)
+                    context = LogContext(
+                        service_name="gitlab-metrics-exporter",
+                        component="get-resources",
+                        operation="grab_data",
+                        project_id=str(project_json["id"]),
+                        project_name=str(GLAB_SERVICE_NAME),
                     )
+                    structured_logger.info("Log events sent for project", context)
             else:
                 print(
                     "No project name matched configured regex "
