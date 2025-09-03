@@ -10,7 +10,11 @@ import datetime
 import time
 from typing import List, Dict, Any, Optional
 import schedule
+from shared.otel.resource_attributes import set_otel_resource_attributes
 from shared.logging import get_logger, LogContext
+
+# Set OTEL_RESOURCE_ATTRIBUTES to prevent taskName warnings
+set_otel_resource_attributes()
 from shared.error_handling import (
     GitLabAPIError,
     ConfigurationError,
