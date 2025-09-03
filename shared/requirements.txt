@@ -4,6 +4,9 @@ opentelemetry-sdk==1.21.0
 opentelemetry-exporter-otlp-proto-grpc==1.21.0
 opentelemetry-instrumentation-logging==0.42b0
 
+# Fix pkg_resources deprecation warning
+setuptools<81
+
 # GitLab API client
 python-gitlab==4.2.0
 

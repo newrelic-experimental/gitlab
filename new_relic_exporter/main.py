@@ -9,10 +9,12 @@ import logging
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
 
-# Initialize OpenTelemetry logging instrumentation
+# Initialize OpenTelemetry logging instrumentation only if not already instrumented
 # Note: The taskName warnings come from automatic environment variable injection
 # We'll handle this by filtering in the job processor instead
-LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
+instrumentor = LoggingInstrumentor()
+if not instrumentor.is_instrumented_by_opentelemetry:
+    instrumentor.instrument(set_logging_format=True, log_level=logging.INFO)
 
 
 def main():
