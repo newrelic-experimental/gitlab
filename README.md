@@ -72,7 +72,6 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_EXCLUDE_JOBS` | Comma-separated list of job or bridge names or stages to exclude from export (e.g. "build,test,deploy,bridge-stage") | True | List* | None |
 | `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
 | `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
-| `Pipeline Bridges Support` | Bridges in pipelines are now exported as spans/logs and can be excluded using `GLAB_EXCLUDE_JOBS` | True | Boolean | True |
 
 # New Relic Metrics Exporter 
 
@@ -99,7 +98,6 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_EXCLUDE_JOBS` | Comma-separated list of job or bridge names or stages to exclude from export (e.g. "build,test,deploy,bridge-stage") | True | List* | None |
 | `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
 | `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
-| `Pipeline Bridges Support` | Bridges in pipelines are now exported as metrics/logs and can be excluded using `GLAB_EXCLUDE_JOBS` | True | Boolean | True |
 *comma separated
 
 **Default configuration is based on using Gitlab runners with docker executor**
@@ -132,7 +130,7 @@ pip install -r shared/requirements.txt
 
 ### Running Tests
 
-The project includes comprehensive test coverage with **322 tests** covering:
+The project includes comprehensive test coverage, covering:
 
 - Configuration management and validation
 - GitLab API integration
@@ -239,30 +237,6 @@ new-relic-metrics:
 - **Docker Images**: 
   - `docker.io/dpacheconr/gitlab-exporter:2.0.0`
   - `docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0`
-
-## Production Deployment
-
-### Docker Compose
-
-Use the provided `docker-compose.yaml` for production deployments:
-
-```bash
-# Set version and build images
-export VERSION=2.0.0
-docker-compose build
-
-# Run services
-docker-compose up -d
-```
-
-### Environment Configuration
-
-Create a `.env` file based on `.env.example`:
-
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
 
 ### Health Monitoring
 
