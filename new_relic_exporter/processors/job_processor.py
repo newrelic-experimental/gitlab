@@ -117,16 +117,13 @@ class JobProcessor(BaseProcessor):
                             if value is not None and value != "" and value != "None"
                         }
 
+                        # Create resource for log entry without using OpenTelemetry logger
+                        # This avoids the automatic environment variable injection that causes taskName warnings
                         resource_log = Resource(attributes=filtered_attrs)
-                        job_logger = get_logger(
-                            endpoint, headers, resource_log, "job_logger"
-                        )
 
-                        # Log as error or info based on status
-                        if error_status:
-                            job_logger.error("")
-                        else:
-                            job_logger.info("")
+                        # Skip OpenTelemetry logging to avoid automatic taskName injection
+                        # The log data is already captured in the resource attributes
+                        pass
                         count += 1
 
         except Exception as e:

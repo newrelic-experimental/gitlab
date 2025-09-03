@@ -14,6 +14,8 @@ from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
 set_otel_resource_attributes()
 
 # Initialize OpenTelemetry logging instrumentation
+# Note: The taskName warnings come from automatic environment variable injection
+# We'll handle this by filtering in the job processor instead
 LoggingInstrumentor().instrument(set_logging_format=True, log_level=logging.INFO)
 
 
