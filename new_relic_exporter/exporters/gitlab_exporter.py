@@ -18,6 +18,7 @@ from shared.error_handling import (
 from ..processors.pipeline_processor import PipelineProcessor
 from ..processors.job_processor import JobProcessor
 from ..processors.bridge_processor import BridgeProcessor
+from ..processors.downstream_processor import DownstreamProcessor
 
 
 class GitLabExporter:
@@ -91,7 +92,8 @@ class GitLabExporter:
         1. Gets the current pipeline from environment variables
         2. Processes the pipeline to create the main span
         3. Processes all jobs in the pipeline
-        4. Finalizes the pipeline span
+        4. Processes bridges and their downstream pipelines
+        5. Finalizes the pipeline span
         """
         context = LogContext(
             service_name="gitlab-exporter",
@@ -156,7 +158,7 @@ class GitLabExporter:
                 self.logger.debug("Initializing processors", context)
                 pipeline_processor = PipelineProcessor(self.config, project, pipeline)
                 job_processor = JobProcessor(self.config, project)
-                bridge_processor = BridgeProcessor(self.config, project)
+                downstream_processor = DownstreamProcessor(self.config, self.gl)
 
                 # Process pipeline and get context
                 self.logger.debug("Processing pipeline", context)
@@ -202,14 +204,15 @@ class GitLabExporter:
                         pipeline_processor.service_name,
                     )
 
-                # Process bridges
+                # Process bridges with their downstream pipelines
                 if bridge_lst:
-                    bridge_processor.process(
+                    downstream_processor.process_bridges_with_downstream(
                         bridge_lst,
                         pipeline_context,
                         self.config.otel_endpoint,
                         self.config.gitlab_headers,
                         pipeline_processor.service_name,
+                        exclude_jobs,
                     )
 
                 # Finalize pipeline
