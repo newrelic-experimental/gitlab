@@ -205,7 +205,7 @@ class BridgeProcessor(BaseProcessor):
                 operation="process_bridge",
                 bridge_id=str(bridge_data["id"]),
             )
-            self.logger.info(
+            self.logger.debug(
                 f"Processed bridge: {bridge_data['name']}",
                 context,
                 extra={
@@ -252,7 +252,7 @@ class BridgeProcessor(BaseProcessor):
             self.logger.info("No bridges to process", context)
             return
 
-        self.logger.info(
+        self.logger.debug(
             "Processing bridges", context, extra={"bridge_count": len(bridge_list)}
         )
 
@@ -278,7 +278,7 @@ class BridgeProcessor(BaseProcessor):
                 # Continue processing other bridges even if one fails
                 continue
 
-        self.logger.info(
+        self.logger.debug(
             "Completed processing bridges",
             context,
             extra={"bridge_count": len(bridge_list)},

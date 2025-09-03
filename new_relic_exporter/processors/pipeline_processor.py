@@ -208,7 +208,7 @@ class PipelineProcessor(BaseProcessor):
                 operation="finalize_pipeline",
                 pipeline_id=str(self.pipeline_json["id"]),
             )
-            self.logger.info(
+            self.logger.debug(
                 "All data sent to New Relic for pipeline",
                 context,
                 extra={"pipeline_id": self.pipeline_json["id"]},

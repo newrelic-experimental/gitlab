@@ -34,7 +34,7 @@ class GitLabExporter:
 
         try:
             self.config = get_config()
-            self.logger.info("Configuration loaded successfully")
+            self.logger.debug("Configuration loaded successfully")
         except Exception as e:
             raise create_config_error(
                 "Failed to load configuration",
@@ -50,7 +50,7 @@ class GitLabExporter:
             else:
                 self.gl = gitlab.Gitlab(private_token=self.config.token)
 
-            self.logger.info(
+            self.logger.debug(
                 "GitLab client initialized",
                 context=LogContext(
                     service_name="gitlab-exporter",
@@ -114,7 +114,7 @@ class GitLabExporter:
                 context.project_id = project_id
                 context.pipeline_id = pipeline_id
 
-                self.logger.info(
+                self.logger.debug(
                     "Starting pipeline data export",
                     context,
                     extra={"project_id": project_id, "pipeline_id": pipeline_id},
@@ -125,7 +125,7 @@ class GitLabExporter:
                     project = self.gl.projects.get(project_id)
                     pipeline = project.pipelines.get(pipeline_id)
 
-                    self.logger.info(
+                    self.logger.debug(
                         "Retrieved GitLab project and pipeline",
                         context,
                         extra={
@@ -157,7 +157,7 @@ class GitLabExporter:
                 bridge_processor = BridgeProcessor(self.config, project)
 
                 # Process pipeline and get context
-                self.logger.info("Processing pipeline", context)
+                self.logger.debug("Processing pipeline", context)
                 pipeline_result = pipeline_processor.process(
                     self.config.otel_endpoint, self.config.gitlab_headers, exclude_jobs
                 )
@@ -170,7 +170,7 @@ class GitLabExporter:
 
                 # Process jobs
                 if job_lst:
-                    self.logger.info(
+                    self.logger.debug(
                         "Processing jobs", context, extra={"job_count": len(job_lst)}
                     )
                     job_processor.process(
@@ -183,7 +183,7 @@ class GitLabExporter:
 
                 # Process bridges
                 if bridge_lst:
-                    self.logger.info(
+                    self.logger.debug(
                         "Processing bridges",
                         context,
                         extra={"bridge_count": len(bridge_lst)},

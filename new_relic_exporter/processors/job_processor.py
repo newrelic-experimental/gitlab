@@ -302,6 +302,6 @@ class JobProcessor(BaseProcessor):
                     operation="process",
                     job_id=str(job.get("id", "unknown")),
                 )
-                self.logger.info(
+                self.logger.debug(
                     "Processing last job in batch", context, extra={"job_data": job}
                 )
