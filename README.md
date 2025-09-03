@@ -1,51 +1,83 @@
-
 [![New Relic Experimental header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Experimental.png)](https://opensource.newrelic.com/oss-category/#new-relic-experimental)
 
-# New Relic Gitlab Exporters
->Monitor Gitlab with OpenTelemetry and New Relic quickstarts
+# New Relic GitLab Exporters
+>Monitor GitLab with OpenTelemetry and New Relic quickstarts
 
-![GitHub forks](https://img.shields.io/github/forks/newrelic-experimental/tls-proxy?style=social)
-![GitHub stars](https://img.shields.io/github/stars/newrelic-experimental/tls-proxy?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/newrelic-experimental/tls-proxy?style=social)
+![GitHub forks](https://img.shields.io/github/forks/newrelic-experimental/gitlab?style=social)
+![GitHub stars](https://img.shields.io/github/stars/newrelic-experimental/gitlab?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/newrelic-experimental/gitlab?style=social)
 
-![GitHub last commit](https://img.shields.io/github/last-commit/newrelic-experimental/tls-proxy)
-![GitHub issues](https://img.shields.io/github/issues/newrelic-experimental/tls-proxy)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/newrelic-experimental/tls-proxy)
+![GitHub last commit](https://img.shields.io/github/last-commit/newrelic-experimental/gitlab)
+![GitHub issues](https://img.shields.io/github/issues/newrelic-experimental/gitlab)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/newrelic-experimental/gitlab)
 
+## Overview
 
-## How to monitor Gitlab with New Relic
+Monitor your GitLab CI/CD pipelines with comprehensive observability using New Relic's GitLab exporters. This project provides two complementary exporters that collect different types of data from your GitLab instance and send it to New Relic using OpenTelemetry.
 
-Now, you can monitor your Gitlab data with New Relic using New Relic Exporter and Metrics Exporter, making it easier to get observability into your CI/CD pipeline health and performance.
+### What You Can Monitor
 
-Using these exporters you will be able to:
+- **Pipeline Performance**: Track pipeline duration, success rates, and failure patterns
+- **Job-Level Insights**: Monitor individual job execution times and resource usage
+- **Distributed Tracing**: Visualize complete pipeline executions as distributed traces with logs in context
+- **DORA Metrics**: Track deployment frequency, lead time, and failure recovery (GitLab Ultimate required)
+- **Runner Metrics**: Monitor GitLab runner performance and availability
+- **Bridge Processing**: Full support for downstream pipeline triggers and multi-project pipelines
 
-- Visualise key metrics on your Gitlab pipelines, such as how long your jobs are taking, how often they are failing
-- Visualise jobs and pipeline executions as distributed traces with logs in context 
-- Pinpoint where issues are coming from in your pipelines.
-- Create alerts on your Gitlab pipelines.
+### GitLab Dashboard
 
-The next image shows a New Relic dashboard with some of the Gitlab metrics you’ll be able to visualise.
+![GitLab Dashboard](screenshots/gitlab_dashboard.jpg)
 
-## Gitlab Dashboard
+## Architecture
 
-![Gitlab Dashboard](screenshots/gitlab_dashboard.jpg)
+This project consists of two main components:
+
+### 1. New Relic Exporter
+- **Purpose**: Exports individual pipeline execution data as distributed traces
+- **Data Type**: Traces and logs for specific pipeline runs
+- **Use Case**: Detailed analysis of individual pipeline executions
+- **Deployment**: Typically runs as part of GitLab CI/CD pipelines
+
+### 2. New Relic Metrics Exporter  
+- **Purpose**: Exports aggregated metrics and historical data
+- **Data Type**: Metrics, project statistics, and runner information
+- **Use Case**: High-level monitoring and alerting across multiple projects
+- **Deployment**: Can run standalone or as scheduled GitLab pipeline
+
+## Configuration System
+
+This project uses a centralized configuration management system with type safety and validation. Configuration is loaded from environment variables and provides backward compatibility with the previous global variables approach.
+
+### Key Features
+
+- **Type-safe configuration** with dataclasses and validation
+- **Automatic New Relic region detection** (US/EU) based on API key
+- **Environment variable validation** with clear error messages
+- **Health monitoring** and configuration validation
+- **Backward compatibility** with deprecation warnings for migration
 
 # New Relic Exporter
 
+All tests should pass. There are no dummy tests included; all tests validate real functionality.
+
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
-| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
+| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | Auto-detected: "https://otlp.nr-data.net:4318" (US) or "https://otlp.eu01.nr-data.net:4318" (EU) |
 | `GLAB_TOKEN` | MASKED - Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
 | `GLAB_EXPORT_LOGS` | Export job logs to New Relic | True | Boolean | True |
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_LOW_DATA_MODE` | export only bear minimum data (only recommended during testing) | True | Boolean | False |
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
+| `GLAB_EXCLUDE_JOBS` | Comma-separated list of job or bridge names or stages to exclude from export (e.g. "build,test,deploy,bridge-stage") | True | List* | None |
+| `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
+| `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
 
+# New Relic Metrics Exporter 
 
 | Variables | Description | Optional | Values | Default |
 | ---       |         --- |       ---| ---    |   ----   |
-| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | "https://otlp.nr-data.net:4318" or "https://otlp.eu01.nr-data.net:4318" |
+| `OTEL_EXPORTER_OTEL_ENDPOINT` | New Relic OTEL endpoint including port | True | String | Auto-detected: "https://otlp.nr-data.net:4318" (US) or "https://otlp.eu01.nr-data.net:4318" (EU) |
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_TOKEN` | MASKED - Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
@@ -54,7 +86,7 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you�
 | `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | True | Bool | False |
 | `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_RUNNERS_INSTANCE` | Obtain runners from gitlab instance instead of project only  | True | String | |
-| `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against “.*” for all | False | Boolean | None |
+| `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against ".*" for all | False | Boolean | None |
 | `GLAB_EXPORT_PATHS_ALL` | When True ignore GLAB_EXPORT_PATHS variable and export projects matching GLAB_EXPORT_PROJECTS_REGEX in any groups or subgroups| True |  Boolean | False |
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 | `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
@@ -63,6 +95,9 @@ The next image shows a New Relic dashboard with some of the Gitlab metrics you�
 | `GLAB_RUNNERS_SCOPE` | Get runners scope : all, active, paused, online, shared, specific (separated by comma) | True | List* | all |
 | `GLAB_STANDALONE` | Set to True if not running as gitlab pipeline schedule | True | Boolean | False |
 | `GLAB_ENVS_DROP` | Extra system environment variables to drop from span attributes | True | List* | Note the following environment variables will always be dropped regardless of this setting: NEW_RELIC_API_KEY,GITLAB_FEATURES,CI_SERVER_TLS_CA_FILE,CI_RUNNER_TAGS,CI_JOB_JWT,CI_JOB_JWT_V1,CI_JOB_JWT_V2,GLAB_TOKEN,GIT_ASKPASS,CI_COMMIT_BEFORE_SHA,CI_BUILD_TOKEN,CI_DEPENDENCY_PROXY_PASSWORD,CI_RUNNER_SHORT_TOKEN,CI_BUILD_BEFORE_SHA,CI_BEFORE_SHA,OTEL_EXPORTER_OTEL_ENDPOINT,GLAB_DIMENSION_METRICS |
+| `GLAB_EXCLUDE_JOBS` | Comma-separated list of job or bridge names or stages to exclude from export (e.g. "build,test,deploy,bridge-stage") | True | List* | None |
+| `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
+| `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
 *comma separated
 
 **Default configuration is based on using Gitlab runners with docker executor**
@@ -71,28 +106,192 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:1.0.16
+    name: docker.io/dpacheconr/gitlab-exporter:2.0.0
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
     - echo "Done"
 ```
 
-## New Relic Quickstart
-> https://newrelic.com/instant-observability/gitlab
+## Development Setup
 
-## How to 
+### Requirements
 
-> https://newrelic.com/blog/how-to-relic/monitor-gitlab-with-opentelemetry
+The project uses pinned dependencies for reproducible builds:
 
-Alternative to running new relic metrics exporter as pipeline schedule:
-Rather than running in a GitLab pipeline the New Relic Metrics exporter can also  be run independently enabling standalone mode. To run in Docker for instance run the following:
- 
-docker run -e GLAB_STANDALONE=True -e GLAB_EXPORT_PATHS="dpacheconr" -e GLAB_EXPORT_PROJECTS_REGEX=".*" -e GLAB_TOKEN=glpat.... -e NEW_RELIC_API_KEY=....NRAL docker.io/dpacheconr/gitlab-metrics-exporter:1.0.15
+- **Dependencies**: `shared/requirements.txt`
+
+Install dependencies:
+
+```bash
+# Production dependencies
+pip install -r shared/requirements.txt
+```
+
+### Running Tests
+
+The project includes comprehensive test coverage, covering:
+
+- Configuration management and validation
+- GitLab API integration
+- New Relic integration
+- Data transformation and processing
+- Performance testing
+- Error handling and edge cases
+- Bridge and downstream pipeline processing
+- OTEL attribute filtering and helpers
+
+Run all tests:
+
+```bash
+python3 -m pytest tests/ -v
+```
+
+Run specific test modules:
+
+```bash
+# Configuration tests
+python3 -m pytest tests/test_config_settings.py -v
+
+# Main module tests
+python3 -m pytest tests/test_main.py -v
+
+# Integration tests
+python3 -m pytest tests/test_gitlab_integration.py -v
+
+# Processor tests
+python3 -m pytest tests/test_*_processor.py -v
+```
+
+Run tests with coverage:
+
+```bash
+python3 -m pytest tests/ --cov=shared --cov=new_relic_exporter --cov=new_relic_metrics_exporter --cov-report=html
+```
+
+## Quick Start
+
+### Prerequisites
+
+1. **GitLab Access Token**: Create a GitLab personal access token with `read_api` scope
+2. **New Relic License Key**: Get your New Relic license key from your account settings
+3. **Docker** (recommended) or Python 3.8+ environment
+
+### Option 1: Docker Deployment (Recommended)
+
+#### New Relic Exporter (Pipeline-level tracing)
+```bash
+# Run as part of your GitLab CI/CD pipeline
+docker run \
+  -e GLAB_TOKEN="your_gitlab_token" \
+  -e NEW_RELIC_API_KEY="your_newrelic_key" \
+  -e GLAB_ENDPOINT="https://gitlab.com" \
+  docker.io/dpacheconr/gitlab-exporter:2.0.0
+```
+
+#### New Relic Metrics Exporter (Standalone monitoring)
+```bash
+# Run standalone for continuous monitoring
+docker run \
+  -e GLAB_STANDALONE=True \
+  -e GLAB_EXPORT_PATHS="your-namespace" \
+  -e GLAB_EXPORT_PROJECTS_REGEX=".*" \
+  -e GLAB_TOKEN="your_gitlab_token" \
+  -e NEW_RELIC_API_KEY="your_newrelic_key" \
+  docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0
+```
+
+### Option 2: GitLab CI/CD Integration
+
+Add to your `.gitlab-ci.yml`:
+
+```yaml
+# For pipeline tracing
+new-relic-export:
+  stage: .post
+  image: docker.io/dpacheconr/gitlab-exporter:2.0.0
+  script:
+    - python3 -u /app/main.py
+  variables:
+    GLAB_TOKEN: $GITLAB_TOKEN
+    NEW_RELIC_API_KEY: $NEW_RELIC_LICENSE_KEY
+  when: always
+
+# For metrics collection (scheduled pipeline)
+new-relic-metrics:
+  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0
+  script:
+    - python3 -u /app/main.py
+  variables:
+    GLAB_TOKEN: $GITLAB_TOKEN
+    NEW_RELIC_API_KEY: $NEW_RELIC_LICENSE_KEY
+    GLAB_EXPORT_PATHS: $CI_PROJECT_ROOT_NAMESPACE
+  only:
+    - schedules
+```
+
+## Resources
+
+- **New Relic Quickstart**: https://newrelic.com/instant-observability/gitlab
+- **Blog Tutorial**: https://newrelic.com/blog/how-to-relic/monitor-gitlab-with-opentelemetry
+- **Docker Images**: 
+  - `docker.io/dpacheconr/gitlab-exporter:2.0.0`
+  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0`
+
+### Health Monitoring
+
+Both exporters include comprehensive health monitoring and structured logging:
+
+- **Structured Logging**: JSON-formatted logs with correlation IDs
+- **Performance Metrics**: Built-in timing and performance tracking
+- **Error Handling**: Graceful error handling with detailed error context
+- **Configuration Validation**: Startup validation of all required settings
+
+### Security Considerations
+
+- **Token Security**: All sensitive tokens are masked in logs
+- **Environment Variables**: Sensitive environment variables are automatically filtered
+- **HTTPS**: All New Relic endpoints use HTTPS by default
+- **Minimal Permissions**: GitLab tokens only require `read_api` scope
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Authentication Errors**
+   - Verify GitLab token has `read_api` scope
+   - Check New Relic license key format
+   - Ensure correct GitLab endpoint URL
+
+2. **No Data in New Relic**
+   - Verify OTEL endpoint is correct for your region
+   - Check network connectivity to New Relic
+   - Review structured logs for export errors
+
+3. **Performance Issues**
+   - Use `GLAB_LOW_DATA_MODE=True` for testing
+   - Adjust `GLAB_EXPORT_LAST_MINUTES` for metrics exporter
+   - Consider excluding jobs with `GLAB_EXCLUDE_JOBS`
+
+### Debug Mode
+
+The project supports configurable logging levels via the `LOG_LEVEL` environment variable:
+
+```bash
+# Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+LOG_LEVEL=DEBUG
+```
 
 ## Contributing
 
-We encourage your contributions to improve [Gitlab Exporters](../../)! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project. If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company, please drop us an email at opensource@newrelic.com.
+We encourage your contributions to improve [GitLab Exporters](../../)! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project. If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company, please drop us an email at opensource@newrelic.com.
+
+### Development Guidelines
+
+- All code must pass the comprehensive test suite (322 tests)
+- Follow the existing code structure and patterns
+- Add tests for new functionality
+- Update documentation for configuration changes
 
 **A note about vulnerabilities**
 
@@ -102,6 +301,6 @@ If you believe you have found a security vulnerability in this project or any of
 
 ## License
 
-Gitlab Exporters are licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
+GitLab Exporters are licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
 
->Gitlab Exporters also use source code from third-party libraries. You can find full details on which libraries are used and the terms under which they are licensed in the third-party notices document.
+>GitLab Exporters also use source code from third-party libraries. You can find full details on which libraries are used and the terms under which they are licensed in the third-party notices document.
