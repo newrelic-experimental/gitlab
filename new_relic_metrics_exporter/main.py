@@ -10,11 +10,8 @@ import datetime
 import time
 from typing import List, Dict, Any, Optional
 import schedule
-from shared.otel.resource_attributes import set_otel_resource_attributes
 from shared.logging import get_logger, LogContext
 
-# Set OTEL_RESOURCE_ATTRIBUTES to prevent taskName warnings
-set_otel_resource_attributes()
 from shared.error_handling import (
     GitLabAPIError,
     ConfigurationError,
@@ -118,6 +115,13 @@ class GitLabMetricsExporter:
                             original_exception=e,
                         ) from e
 
+                # Log project names for visibility
+                project_names = [
+                    project.name for project in projects[:10]
+                ]  # Show first 10
+                if len(projects) > 10:
+                    project_names.append(f"... and {len(projects) - 10} more")
+
                 self.logger.info(
                     f"Retrieved total of {len(projects)} projects",
                     context,
@@ -125,6 +129,7 @@ class GitLabMetricsExporter:
                         "total_projects": len(projects),
                         "ownership": GLAB_PROJECT_OWNERSHIP,
                         "visibilities": GLAB_PROJECT_VISIBILITIES,
+                        "sample_projects": project_names,
                     },
                 )
 
@@ -240,11 +245,16 @@ class GitLabMetricsExporter:
                     self.logger.warning("No projects found to export", context)
                     return collection_results
 
-                # Process projects concurrently
+                # Log which projects will be processed
+                project_names = [project.name for project in projects]
+
                 self.logger.info(
                     f"Starting concurrent processing of {len(projects)} projects",
                     context,
-                    extra={"project_count": len(projects)},
+                    extra={
+                        "project_count": len(projects),
+                        "projects": project_names,
+                    },
                 )
 
                 # Create tasks for concurrent processing
@@ -280,8 +290,29 @@ class GitLabMetricsExporter:
                 collection_results["duration_seconds"] = time.time() - self.start_time
                 timer["success"] = True
 
+                # Log completion summary with project details
+                successful_projects = []
+                failed_projects = []
+
+                for result in results:
+                    if isinstance(result, dict):
+                        if result.get("success", False):
+                            successful_projects.append(
+                                result.get("project_name", "unknown")
+                            )
+                        else:
+                            failed_projects.append(
+                                result.get("project_name", "unknown")
+                            )
+
+                completion_summary = {
+                    **collection_results,
+                    "successful_projects_list": successful_projects,
+                    "failed_projects_list": failed_projects,
+                }
+
                 self.logger.info(
-                    "Metrics collection completed", context, extra=collection_results
+                    "Metrics collection completed", context, extra=completion_summary
                 )
 
             except Exception as e:

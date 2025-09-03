@@ -1,5 +1,6 @@
 import time
 import json
+import sys
 from pyrfc3339 import parse
 import os
 from re import search
@@ -49,9 +50,9 @@ def check_env_vars():
         )
         for key in keys_not_set:
             logger.critical(
-                f"Environment variable not set: {key}", context, variable=key
+                f"Environment variable not set: {key}", context, extra={"variable": key}
             )
-        exit(1)
+        sys.exit(1)
     else:
         pass  # All required environment variables set
 

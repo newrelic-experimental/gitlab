@@ -14,4 +14,4 @@ build/
 examples/
 job.log
 .coverage
-
+htmlcov/

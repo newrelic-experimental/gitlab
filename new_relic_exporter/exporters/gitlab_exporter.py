@@ -125,12 +125,14 @@ class GitLabExporter:
                     project = self.gl.projects.get(project_id)
                     pipeline = project.pipelines.get(pipeline_id)
 
-                    self.logger.debug(
-                        "Retrieved GitLab project and pipeline",
+                    self.logger.info(
+                        "Processing pipeline",
                         context,
                         extra={
                             "project_name": project.name,
+                            "pipeline_name": f"Pipeline #{pipeline.iid}",
                             "pipeline_status": pipeline.status,
+                            "pipeline_ref": getattr(pipeline, "ref", "unknown"),
                         },
                     )
                 except gitlab.exceptions.GitlabGetError as e:
@@ -168,11 +170,30 @@ class GitLabExporter:
 
                 pipeline_span, pipeline_context, job_lst, bridge_lst = pipeline_result
 
+                # Log summary of what will be processed
+                job_names = (
+                    [job.get("name", "unknown") for job in job_lst] if job_lst else []
+                )
+                bridge_names = (
+                    [bridge.get("name", "unknown") for bridge in bridge_lst]
+                    if bridge_lst
+                    else []
+                )
+
+                if job_names or bridge_names:
+                    self.logger.info(
+                        "Processing pipeline data",
+                        context,
+                        extra={
+                            "jobs": job_names,
+                            "bridges": bridge_names,
+                            "job_count": len(job_lst),
+                            "bridge_count": len(bridge_lst),
+                        },
+                    )
+
                 # Process jobs
                 if job_lst:
-                    self.logger.debug(
-                        "Processing jobs", context, extra={"job_count": len(job_lst)}
-                    )
                     job_processor.process(
                         job_lst,
                         pipeline_context,
@@ -183,11 +204,6 @@ class GitLabExporter:
 
                 # Process bridges
                 if bridge_lst:
-                    self.logger.debug(
-                        "Processing bridges",
-                        context,
-                        extra={"bridge_count": len(bridge_lst)},
-                    )
                     bridge_processor.process(
                         bridge_lst,
                         pipeline_context,
@@ -200,7 +216,18 @@ class GitLabExporter:
                 self.logger.debug("Finalizing pipeline", context)
                 pipeline_processor.finalize_pipeline(pipeline_span)
 
-                self.logger.info("Pipeline data export completed successfully", context)
+                # Log completion summary
+                self.logger.info(
+                    "Pipeline data export completed successfully",
+                    context,
+                    extra={
+                        "project_name": project.name,
+                        "pipeline_name": f"Pipeline #{pipeline.iid}",
+                        "jobs_processed": len(job_lst),
+                        "bridges_processed": len(bridge_lst),
+                        "total_items": len(job_lst) + len(bridge_lst),
+                    },
+                )
                 timer["success"] = True
 
             except (ConfigurationError, GitLabAPIError) as e:
