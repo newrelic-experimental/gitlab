@@ -10,8 +10,6 @@ dist/
 build/
 .vscode/
 .env
-.env-example
-.env.example
 examples/
 job.log
 .coverage
