@@ -144,7 +144,14 @@ def parse_attributes(obj):
 
     for attribute in obj:
         attribute_name = str(attribute).lower()
-        if attribute_name not in attributes_to_drop:
+        # Skip None values and problematic task-related attributes early
+        if (
+            attribute_name not in attributes_to_drop
+            and obj[attribute] is not None
+            and obj[attribute] != "None"
+            and obj[attribute] != ""
+            and "task" not in attribute_name.lower()
+        ):
             if do_parse(obj[attribute]):
                 if type(obj[attribute]) is dict:
                     for sub_att in obj[attribute]:
@@ -152,24 +159,41 @@ def parse_attributes(obj):
                         if attribute_name not in attributes_to_drop:
                             if type(obj[attribute][sub_att]) is dict:
                                 for att in obj[attribute][sub_att]:
-                                    attribute_name = (
-                                        do_string(attribute)
-                                        + "."
-                                        + do_string(sub_att)
-                                        + "."
-                                        + do_string(att)
-                                    )
-                                    if attribute_name not in attributes_to_drop:
-                                        if GLAB_CONVERT_TO_TIMESTAMP:
-                                            if search("_at|_date", attribute_name):
-                                                if do_parse(
-                                                    str(obj[attribute][sub_att][att])
-                                                ):
-                                                    obj_atts[attribute_name] = do_time(
+                                    # Skip None values and task-related attributes
+                                    if (
+                                        obj[attribute][sub_att][att] is not None
+                                        and obj[attribute][sub_att][att] != "None"
+                                        and obj[attribute][sub_att][att] != ""
+                                        and "task" not in str(att).lower()
+                                    ):
+                                        attribute_name = (
+                                            do_string(attribute)
+                                            + "."
+                                            + do_string(sub_att)
+                                            + "."
+                                            + do_string(att)
+                                        )
+                                        if attribute_name not in attributes_to_drop:
+                                            if GLAB_CONVERT_TO_TIMESTAMP:
+                                                if search("_at|_date", attribute_name):
+                                                    if do_parse(
                                                         str(
                                                             obj[attribute][sub_att][att]
                                                         )
-                                                    )
+                                                    ):
+                                                        obj_atts[attribute_name] = (
+                                                            do_time(
+                                                                str(
+                                                                    obj[attribute][
+                                                                        sub_att
+                                                                    ][att]
+                                                                )
+                                                            )
+                                                        )
+                                                    else:
+                                                        obj_atts[attribute_name] = str(
+                                                            obj[attribute][sub_att][att]
+                                                        )
                                                 else:
                                                     obj_atts[attribute_name] = str(
                                                         obj[attribute][sub_att][att]
@@ -178,16 +202,19 @@ def parse_attributes(obj):
                                                 obj_atts[attribute_name] = str(
                                                     obj[attribute][sub_att][att]
                                                 )
-                                        else:
-                                            obj_atts[attribute_name] = str(
-                                                obj[attribute][sub_att][att]
-                                            )
 
                             elif type(obj[attribute][sub_att]) is list:
                                 for key in obj[attribute][sub_att]:
                                     if type(key) is dict:
                                         for att in key:
-                                            if do_parse(key[att]):
+                                            # Skip None values and task-related attributes
+                                            if (
+                                                do_parse(key[att])
+                                                and key[att] is not None
+                                                and key[att] != "None"
+                                                and key[att] != ""
+                                                and "task" not in str(att).lower()
+                                            ):
                                                 attribute_name = (
                                                     do_string(attribute)
                                                     + "."
@@ -271,7 +298,14 @@ def parse_attributes(obj):
                     for key in obj[attribute]:
                         if type(key) is dict:
                             for att in key:
-                                if do_parse(key[att]):
+                                # Skip None values and task-related attributes
+                                if (
+                                    do_parse(key[att])
+                                    and key[att] is not None
+                                    and key[att] != "None"
+                                    and key[att] != ""
+                                    and "task" not in str(att).lower()
+                                ):
                                     attribute_name = (
                                         do_string(attribute) + "." + do_string(att)
                                     )
