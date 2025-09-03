@@ -36,6 +36,11 @@ class LogContext:
     pipeline_id: Optional[str] = None
     job_id: Optional[str] = None
     bridge_id: Optional[str] = None
+    project_name: Optional[str] = None
+    runner_id: Optional[str] = None
+    deployment_id: Optional[str] = None
+    environment_id: Optional[str] = None
+    release_tag: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert context to dictionary for logging."""
@@ -54,6 +59,16 @@ class LogContext:
             context["job_id"] = self.job_id
         if self.bridge_id:
             context["bridge_id"] = self.bridge_id
+        if self.project_name:
+            context["project_name"] = self.project_name
+        if self.runner_id:
+            context["runner_id"] = self.runner_id
+        if self.deployment_id:
+            context["deployment_id"] = self.deployment_id
+        if self.environment_id:
+            context["environment_id"] = self.environment_id
+        if self.release_tag:
+            context["release_tag"] = self.release_tag
 
         return context
 

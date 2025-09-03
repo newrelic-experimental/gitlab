@@ -430,7 +430,9 @@ def main():
                     component="main",
                     operation="main",
                 )
-                exporter.logger.info("Collection completed", context, results=results)
+                exporter.logger.info(
+                    "Collection completed", context, extra={"results": results}
+                )
             finally:
                 loop.close()
                 asyncio.set_event_loop(None)

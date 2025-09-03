@@ -79,7 +79,7 @@ def get_runners():
                 structured_logger.info(
                     "No runners found available to this user, not exporting any runner data",
                     context,
-                    runner_count=len(runners),
+                    extra={"runner_count": len(runners)},
                 )
             else:
                 for runner in runners:
@@ -236,8 +236,10 @@ async def grab_data(project):
                 structured_logger.info(
                     "No project name matched configured regex",
                     context,
-                    regex=str(GLAB_EXPORT_PROJECTS_REGEX),
-                    paths=str(paths),
+                    extra={
+                        "regex": str(GLAB_EXPORT_PROJECTS_REGEX),
+                        "paths": str(paths),
+                    },
                 )
     except Exception as e:
         context = LogContext(
@@ -394,7 +396,9 @@ async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
             project_id=str(project_id),
         )
         structured_logger.info(
-            "Number of deployments found", context, deployment_count=len(deployments)
+            "Number of deployments found",
+            context,
+            extra={"deployment_count": len(deployments)},
         )
         context = LogContext(
             service_name="gitlab-metrics-exporter",
@@ -405,7 +409,7 @@ async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
         structured_logger.info(
             "Number of deployments that matched export configuration",
             context,
-            matching_count=deployments_matching,
+            extra={"matching_count": deployments_matching},
         )
 
 
@@ -467,7 +471,9 @@ async def get_environments(current_project, project_id, GLAB_SERVICE_NAME):
             project_id=str(project_id),
         )
         structured_logger.info(
-            "Number of environments found", context, environment_count=len(environments)
+            "Number of environments found",
+            context,
+            extra={"environment_count": len(environments)},
         )
     else:
         context = LogContext(
@@ -546,7 +552,7 @@ async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
             project_id=str(project_id),
         )
         structured_logger.info(
-            "Number of releases found", context, release_count=len(releases)
+            "Number of releases found", context, extra={"release_count": len(releases)}
         )
         context = LogContext(
             service_name="gitlab-metrics-exporter",
@@ -557,7 +563,7 @@ async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
         structured_logger.info(
             "Number of releases that matched export configuration",
             context,
-            matching_count=releases_matching,
+            extra={"matching_count": releases_matching},
         )
 
 
@@ -664,7 +670,7 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
     structured_logger.info(
         "Found pipelines in project, processing",
         context,
-        pipeline_count=len(pipelines),
+        extra={"pipeline_count": len(pipelines)},
     )
     if len(pipelines) > 0:  # check if there are pipelines in this project
         # setting workers to 5 due to gitlab api limits
