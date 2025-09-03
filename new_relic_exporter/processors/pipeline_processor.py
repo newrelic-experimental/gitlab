@@ -12,6 +12,7 @@ from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from opentelemetry.trace import Status, StatusCode
 from shared.custom_parsers import do_time, grab_span_att_vars, parse_attributes
 from shared.otel import get_tracer
+from shared.logging.structured_logger import get_logger, LogContext
 from .base_processor import BaseProcessor
 
 
@@ -35,6 +36,7 @@ class PipelineProcessor(BaseProcessor):
         self.project = project
         self.pipeline = pipeline
         self.pipeline_json = json.loads(pipeline.to_json())
+        self.logger = get_logger("gitlab-exporter", "pipeline-processor")
 
         # Set service name based on project
         self.service_name = (
@@ -173,7 +175,16 @@ class PipelineProcessor(BaseProcessor):
 
         # Check if we have any data to export
         if len(job_lst) == 0 and len(bridge_lst) == 0:
-            print("No data to export, all jobs and bridges excluded or are exporters")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="pipeline-processor",
+                operation="process",
+                pipeline_id=str(self.pipeline_json["id"]),
+            )
+            self.logger.info(
+                "No data to export, all jobs and bridges excluded or are exporters",
+                context,
+            )
             return None, None, [], []
 
         # Create pipeline span
@@ -191,6 +202,14 @@ class PipelineProcessor(BaseProcessor):
         """
         if pipeline_span:
             pipeline_span.end(end_time=do_time(str(self.pipeline_json["finished_at"])))
-            print(
-                f"All data sent to New Relic for pipeline: {self.pipeline_json['id']}"
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="pipeline-processor",
+                operation="finalize_pipeline",
+                pipeline_id=str(self.pipeline_json["id"]),
+            )
+            self.logger.info(
+                "All data sent to New Relic for pipeline",
+                context,
+                extra={"pipeline_id": self.pipeline_json["id"]},
             )

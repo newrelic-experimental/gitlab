@@ -16,6 +16,7 @@ warnings.filterwarnings(
 import logging
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
+from shared.logging.structured_logger import get_logger, LogContext
 
 # Initialize OpenTelemetry logging instrumentation only if not already instrumented
 # Note: The taskName warnings come from automatic environment variable injection
@@ -34,17 +35,25 @@ def main():
     2. Exports pipeline data to New Relic
     3. Handles any errors gracefully
     """
+    # Initialize logger
+    logger = get_logger("gitlab-exporter", "main")
+    context = LogContext(
+        service_name="gitlab-exporter",
+        component="main",
+        operation="export_pipeline_data",
+    )
+
     try:
-        print("Starting GitLab New Relic Exporter")
+        logger.info("Starting GitLab New Relic Exporter", context)
 
         # Create and run the exporter
         exporter = GitLabExporter()
         exporter.export_pipeline_data()
 
-        print("GitLab New Relic Exporter completed successfully")
+        logger.info("GitLab New Relic Exporter completed successfully", context)
 
     except Exception as e:
-        print(f"Fatal error in GitLab exporter: {e}")
+        logger.critical("Fatal error in GitLab exporter", context, exception=e)
         raise
 
 

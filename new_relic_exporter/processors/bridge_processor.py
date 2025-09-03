@@ -14,6 +14,7 @@ from opentelemetry.trace import Status, StatusCode
 from shared.config.settings import GitLabConfig
 from shared.custom_parsers import do_time, parse_attributes
 from shared.otel import get_tracer
+from shared.logging.structured_logger import get_logger, LogContext
 from .base_processor import BaseProcessor
 
 
@@ -35,6 +36,7 @@ class BridgeProcessor(BaseProcessor):
         """
         super().__init__(config)
         self.project = project
+        self.logger = get_logger("gitlab-exporter", "bridge-processor")
 
     def create_bridge_resource(
         self, bridge_data: Dict[str, Any], service_name: str
@@ -197,10 +199,29 @@ class BridgeProcessor(BaseProcessor):
 
                 child.end(end_time=end_time)
 
-            print(f"Processed bridge: {bridge_data['name']} (ID: {bridge_data['id']})")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="bridge-processor",
+                operation="process_bridge",
+                bridge_id=str(bridge_data["id"]),
+            )
+            self.logger.info(
+                f"Processed bridge: {bridge_data['name']}",
+                context,
+                extra={
+                    "bridge_id": bridge_data["id"],
+                    "bridge_name": bridge_data["name"],
+                },
+            )
 
         except Exception as e:
-            print(f"Error processing bridge {bridge_data.get('id', 'unknown')}: {e}")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="bridge-processor",
+                operation="process_bridge",
+                bridge_id=str(bridge_data.get("id", "unknown")),
+            )
+            self.logger.error("Error processing bridge", context, exception=e)
             raise
 
     def process(
@@ -221,11 +242,19 @@ class BridgeProcessor(BaseProcessor):
             headers: Headers for OTEL exporter
             service_name: Service name for tracing
         """
+        context = LogContext(
+            service_name="gitlab-exporter",
+            component="bridge-processor",
+            operation="process_bridges",
+        )
+
         if not bridge_list:
-            print("No bridges to process")
+            self.logger.info("No bridges to process", context)
             return
 
-        print(f"Processing {len(bridge_list)} bridges...")
+        self.logger.info(
+            "Processing bridges", context, extra={"bridge_count": len(bridge_list)}
+        )
 
         for bridge_data in bridge_list:
             try:
@@ -237,10 +266,20 @@ class BridgeProcessor(BaseProcessor):
                     service_name,
                 )
             except Exception as e:
-                print(
-                    f"Failed to process bridge {bridge_data.get('id', 'unknown')}: {e}"
+                bridge_context = LogContext(
+                    service_name="gitlab-exporter",
+                    component="bridge-processor",
+                    operation="process_bridges",
+                    bridge_id=str(bridge_data.get("id", "unknown")),
+                )
+                self.logger.error(
+                    "Failed to process bridge", bridge_context, exception=e
                 )
                 # Continue processing other bridges even if one fails
                 continue
 
-        print(f"Completed processing {len(bridge_list)} bridges")
+        self.logger.info(
+            "Completed processing bridges",
+            context,
+            extra={"bridge_count": len(bridge_list)},
+        )
