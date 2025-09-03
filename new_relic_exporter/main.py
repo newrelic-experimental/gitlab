@@ -6,8 +6,14 @@ and focused, testable classes for pipeline, job, and bridge processing.
 """
 
 import logging
+import warnings
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from new_relic_exporter.exporters.gitlab_exporter import GitLabExporter
+
+# Suppress pkg_resources deprecation warnings from OpenTelemetry dependencies
+warnings.filterwarnings(
+    "ignore", message="pkg_resources is deprecated", category=UserWarning
+)
 
 # Initialize OpenTelemetry logging instrumentation only if not already instrumented
 # Note: The taskName warnings come from automatic environment variable injection
