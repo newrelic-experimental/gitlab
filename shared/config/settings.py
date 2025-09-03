@@ -255,11 +255,13 @@ def validate_environment() -> None:
         logger.critical(
             f"Missing required environment variables: {', '.join(missing_vars)}",
             context,
-            missing_variables=missing_vars,
+            extra={"missing_variables": missing_vars},
         )
         logger.critical("Please set the following environment variables:", context)
         for var in missing_vars:
-            logger.critical(f"  export {var}=<your_value>", context, variable=var)
+            logger.critical(
+                f"  export {var}=<your_value>", context, extra={"variable": var}
+            )
         raise SystemExit(1)
 
 
