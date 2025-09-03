@@ -8,6 +8,10 @@ from shared.custom_parsers import parse_attributes, parse_metrics_attributes
 from shared.otel.logging_filter import instrument_logging_with_filtering
 from shared.otel.span_filter import patch_span_creation
 from opentelemetry.sdk.resources import SERVICE_NAME
+from shared.logging.structured_logger import (
+    get_logger as get_structured_logger,
+    LogContext,
+)
 import re
 from shared.global_variables import *
 import requests

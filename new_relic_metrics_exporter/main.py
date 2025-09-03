@@ -394,7 +394,12 @@ def main():
 
             try:
                 results = loop.run_until_complete(exporter.run_collection())
-                print(f"Collection completed. Results: {results}")
+                context = LogContext(
+                    service_name="gitlab-metrics-exporter",
+                    component="main",
+                    operation="main",
+                )
+                exporter.logger.info("Collection completed", context, results=results)
             finally:
                 loop.close()
                 asyncio.set_event_loop(None)
@@ -403,7 +408,14 @@ def main():
                     gl.session.close()
 
     except Exception as e:
-        print(f"Fatal error in metrics exporter: {e}")
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="main",
+            operation="main",
+        )
+        exporter.logger.critical(
+            "Fatal error in metrics exporter", context, exception=e
+        )
         raise
 
 

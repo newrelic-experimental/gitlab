@@ -2,6 +2,7 @@ import time
 from pyrfc3339 import parse
 import os
 from re import search
+from shared.logging.structured_logger import get_logger, LogContext
 
 GLAB_CONVERT_TO_TIMESTAMP = False
 
@@ -28,6 +29,7 @@ def do_parse(string):
 
 
 def check_env_vars():
+    logger = get_logger("gitlab-exporter", "custom-parsers")
     keys = ("GLAB_TOKEN", "NEW_RELIC_API_KEY")
 
     keys_not_set = []
@@ -39,8 +41,15 @@ def check_env_vars():
         pass
 
     if len(keys_not_set) > 0:
+        context = LogContext(
+            service_name="gitlab-exporter",
+            component="custom-parsers",
+            operation="check_env_vars",
+        )
         for key in keys_not_set:
-            print(key + " not set")
+            logger.critical(
+                f"Environment variable not set: {key}", context, variable=key
+            )
         exit(1)
     else:
         pass  # All required environment variables set
@@ -92,8 +101,18 @@ def grab_span_att_vars():
                     user_envs_to_drop = str(os.getenv("GLAB_ENVS_DROP")).split(",")
                     for attribute in user_envs_to_drop:
                         atts_to_remove.append(attribute)
-            except:
-                print("Unable to parse GLAB_ENVS_DROP, check your configuration")
+            except Exception as e:
+                logger = get_logger("gitlab-exporter", "custom-parsers")
+                context = LogContext(
+                    service_name="gitlab-exporter",
+                    component="custom-parsers",
+                    operation="grab_span_att_vars",
+                )
+                logger.error(
+                    "Unable to parse GLAB_ENVS_DROP, check your configuration",
+                    context,
+                    exception=e,
+                )
 
         for item in atts_to_remove:
             atts.pop(item, None)
@@ -106,7 +125,13 @@ def grab_span_att_vars():
         }
 
     except Exception as e:
-        print(e)
+        logger = get_logger("gitlab-exporter", "custom-parsers")
+        context = LogContext(
+            service_name="gitlab-exporter",
+            component="custom-parsers",
+            operation="grab_span_att_vars",
+        )
+        logger.error("Error processing span attributes", context, exception=e)
         filtered_atts = {}
 
     return filtered_atts
@@ -128,8 +153,18 @@ def parse_attributes(obj):
                 )
                 for attribute in user_attributes_to_drop:
                     attributes_to_drop.append(attribute)
-        except:
-            print("Unable to parse GLAB_ATTRIBUTES_DROP, check your configuration")
+        except Exception as e:
+            logger = get_logger("gitlab-exporter", "custom-parsers")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="custom-parsers",
+                operation="parse_attributes",
+            )
+            logger.error(
+                "Unable to parse GLAB_ATTRIBUTES_DROP, check your configuration",
+                context,
+                exception=e,
+            )
 
     for attribute in obj:
         attribute_name = str(attribute).lower()
@@ -150,9 +185,17 @@ def parse_metrics_attributes(attributes):
                 )
                 for attribute in user_attributes_to_keep:
                     metrics_attributes_to_keep.append(attribute)
-        except:
-            print(
-                "Unable to parse GLAB_DIMENSION_METRICS, exporting with default dimensions, check your configuration"
+        except Exception as e:
+            logger = get_logger("gitlab-exporter", "custom-parsers")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="custom-parsers",
+                operation="parse_metrics_attributes",
+            )
+            logger.error(
+                "Unable to parse GLAB_DIMENSION_METRICS, exporting with default dimensions, check your configuration",
+                context,
+                exception=e,
             )
 
     for attribute in attributes:

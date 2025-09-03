@@ -13,6 +13,10 @@ from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from opentelemetry.trace import Status, StatusCode
 from shared.custom_parsers import do_time, parse_attributes, do_parse
 from shared.otel import create_resource_attributes, get_tracer, get_logger
+from shared.logging.structured_logger import (
+    get_logger as get_structured_logger,
+    LogContext,
+)
 from .base_processor import BaseProcessor
 
 
@@ -34,6 +38,7 @@ class JobProcessor(BaseProcessor):
         super().__init__(config)
         self.project = project
         self.ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+        self.logger = get_structured_logger("gitlab-exporter", "job-processor")
 
     def create_job_resource(self, job: Dict[str, Any], service_name: str) -> Resource:
         """
@@ -127,7 +132,13 @@ class JobProcessor(BaseProcessor):
                         count += 1
 
         except Exception as e:
-            print(f"Error processing job logs: {e}")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="job-processor",
+                operation="handle_job_logs",
+                job_id=str(job.get("id", "unknown")),
+            )
+            self.logger.error("Error processing job logs", context, exception=e)
 
     def extract_error_message(self, job: Dict[str, Any]) -> str:
         """
@@ -163,7 +174,13 @@ class JobProcessor(BaseProcessor):
                 return str(job["failure_reason"])
 
         except Exception as e:
-            print(f"Error extracting error message: {e}")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="job-processor",
+                operation="extract_error_message",
+                job_id=str(job.get("id", "unknown")),
+            )
+            self.logger.error("Error extracting error message", context, exception=e)
             return str(job.get("failure_reason", "Unknown error"))
 
     def process_job(
@@ -233,13 +250,28 @@ class JobProcessor(BaseProcessor):
                         error_status,
                     )
                 else:
-                    print("Not configured to send logs to New Relic, skip...")
+                    context = LogContext(
+                        service_name="gitlab-exporter",
+                        component="job-processor",
+                        operation="process_job",
+                        job_id=str(job.get("id", "unknown")),
+                    )
+                    self.logger.info(
+                        "Not configured to send logs to New Relic, skipping log export",
+                        context,
+                    )
 
                 # End the job span
                 child.end(end_time=do_time(job["finished_at"]))
 
         except Exception as e:
-            print(f"Error processing job {job.get('id', 'unknown')}: {e}")
+            context = LogContext(
+                service_name="gitlab-exporter",
+                component="job-processor",
+                operation="process_job",
+                job_id=str(job.get("id", "unknown")),
+            )
+            self.logger.error("Error processing job", context, exception=e)
 
     def process(
         self,
@@ -264,4 +296,10 @@ class JobProcessor(BaseProcessor):
 
             # Debug output for last job
             if job == jobs[-1]:
-                print(job)
+                context = LogContext(
+                    service_name="gitlab-exporter",
+                    component="job-processor",
+                    operation="process",
+                    job_id=str(job.get("id", "unknown")),
+                )
+                self.logger.info("Processing last job in batch", context, job_data=job)

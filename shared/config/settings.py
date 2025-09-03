@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Union
 from urllib.parse import urlparse
+from shared.logging.structured_logger import get_logger, LogContext
 
 
 @dataclass
@@ -234,6 +235,7 @@ def validate_environment() -> None:
     Raises:
         SystemExit: If required variables are missing
     """
+    logger = get_logger("gitlab-exporter", "config")
     required_vars = ["GLAB_TOKEN", "NEW_RELIC_API_KEY"]
     missing_vars = []
 
@@ -242,12 +244,19 @@ def validate_environment() -> None:
             missing_vars.append(var)
 
     if missing_vars:
-        print(
-            f"ERROR: Missing required environment variables: {', '.join(missing_vars)}"
+        context = LogContext(
+            service_name="gitlab-exporter",
+            component="config",
+            operation="validate_environment",
         )
-        print("Please set the following environment variables:")
+        logger.critical(
+            f"Missing required environment variables: {', '.join(missing_vars)}",
+            context,
+            missing_variables=missing_vars,
+        )
+        logger.critical("Please set the following environment variables:", context)
         for var in missing_vars:
-            print(f"  export {var}=<your_value>")
+            logger.critical(f"  export {var}=<your_value>", context, variable=var)
         raise SystemExit(1)
 
 
