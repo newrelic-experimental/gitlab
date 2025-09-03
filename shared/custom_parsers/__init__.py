@@ -137,10 +137,11 @@ def grab_span_att_vars():
     return filtered_atts
 
 
-def parse_attributes(obj):
+def parse_attributes(obj, prefix=""):
     """
     Simple attribute parser that flattens GitLab job data into key-value pairs.
     Uses do_parse() to filter out None, empty, and invalid values.
+    Handles nested objects by flattening them with dot notation.
     """
     obj_atts = {}
     attributes_to_drop = [""]
@@ -168,8 +169,17 @@ def parse_attributes(obj):
 
     for attribute in obj:
         attribute_name = str(attribute).lower()
-        if attribute_name not in attributes_to_drop and do_parse(obj[attribute]):
-            obj_atts[attribute_name] = str(obj[attribute])
+        full_attribute_name = f"{prefix}.{attribute_name}" if prefix else attribute_name
+
+        if attribute_name not in attributes_to_drop:
+            value = obj[attribute]
+
+            # Handle nested dictionaries by recursively flattening them
+            if isinstance(value, dict):
+                nested_attrs = parse_attributes(value, full_attribute_name)
+                obj_atts.update(nested_attrs)
+            elif do_parse(value):
+                obj_atts[full_attribute_name] = str(value)
 
     return obj_atts
 

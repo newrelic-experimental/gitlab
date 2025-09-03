@@ -235,22 +235,31 @@ async def grab_data(project):
                     )
                     structured_logger.info("Log events sent for project", context)
             else:
-                print(
-                    "No project name matched configured regex "
-                    + '"'
-                    + str(GLAB_EXPORT_PROJECTS_REGEX)
-                    + '" in paths '
-                    + '"'
-                    + str(paths)
-                    + '"'
+                context = LogContext(
+                    service_name="gitlab-metrics-exporter",
+                    component="get-resources",
+                    operation="grab_data",
+                    project_name=str((project.attributes.get("name_with_namespace")))
+                    .lower()
+                    .replace(" ", ""),
+                )
+                structured_logger.info(
+                    "No project name matched configured regex",
+                    context,
+                    regex=str(GLAB_EXPORT_PROJECTS_REGEX),
+                    paths=str(paths),
                 )
     except Exception as e:
-        print(
-            str(e)
-            + " -> ERROR obtaining data for project:  "
-            + str((project.attributes.get("name_with_namespace")))
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="grab_data",
+            project_name=str((project.attributes.get("name_with_namespace")))
             .lower()
-            .replace(" ", "")
+            .replace(" ", ""),
+        )
+        structured_logger.error(
+            "ERROR obtaining data for project", context, exception=e
         )
 
 
@@ -353,17 +362,24 @@ def parse_deployment(data):
         global_logger._log(
             level=logging.INFO, msg=msg, extra=deployment_attributes, args=""
         )
-        print(
-            "Log events sent for deployment: "
-            + str(deployment_json["id"])
-            + " from project: "
-            + str(project_id)
-            + " - "
-            + str(GLAB_SERVICE_NAME)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_deployment",
+            deployment_id=str(deployment_json["id"]),
+            project_id=str(project_id),
+            project_name=str(GLAB_SERVICE_NAME),
         )
+        structured_logger.info("Log events sent for deployment", context)
     except Exception as e:
-        print(
-            "Failed to obtain deployments for project", project_id, " due to error ", e
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_deployment",
+            project_id=str(project_id),
+        )
+        structured_logger.error(
+            "Failed to obtain deployments for project", context, exception=e
         )
 
 
@@ -384,10 +400,25 @@ async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
                 deployments_matching += 1
             else:
                 break
-        print("Number of deployments found", str(len(deployments)))
-        print(
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="get_deployments",
+            project_id=str(project_id),
+        )
+        structured_logger.info(
+            "Number of deployments found", context, deployment_count=len(deployments)
+        )
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="get_deployments",
+            project_id=str(project_id),
+        )
+        structured_logger.info(
             "Number of deployments that matched export configuration",
-            str(deployments_matching),
+            context,
+            matching_count=deployments_matching,
         )
 
 
@@ -412,17 +443,24 @@ def parse_environment(data):
         global_logger._log(
             level=logging.INFO, msg=msg, extra=environment_attributes, args=""
         )
-        print(
-            "Log events sent for environment: "
-            + str(environment_json["id"])
-            + " from project: "
-            + str(project_id)
-            + " - "
-            + str(GLAB_SERVICE_NAME)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_environment",
+            environment_id=str(environment_json["id"]),
+            project_id=str(project_id),
+            project_name=str(GLAB_SERVICE_NAME),
         )
+        structured_logger.info("Log events sent for environment", context)
     except Exception as e:
-        print(
-            "Failed to obtain environments for project", project_id, " due to error ", e
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_environment",
+            project_id=str(project_id),
+        )
+        structured_logger.error(
+            "Failed to obtain environments for project", context, exception=e
         )
 
 
@@ -435,9 +473,23 @@ async def get_environments(current_project, project_id, GLAB_SERVICE_NAME):
             # we should send data for every environment each time
             q.put([environment_json, project_id, GLAB_SERVICE_NAME, "environment"])
 
-        print("Number of environments found", str(len(environments)))
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="get_environments",
+            project_id=str(project_id),
+        )
+        structured_logger.info(
+            "Number of environments found", context, environment_count=len(environments)
+        )
     else:
-        print("No environments found in project ", str(project_id))
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="get_environments",
+            project_id=str(project_id),
+        )
+        structured_logger.info("No environments found in project", context)
 
 
 def parse_release(data):
@@ -461,17 +513,24 @@ def parse_release(data):
         global_logger._log(
             level=logging.INFO, msg=msg, extra=release_attributes, args=""
         )
-        print(
-            "Log events sent for release: "
-            + str(release_json["tag_name"])
-            + " from project: "
-            + str(project_id)
-            + " - "
-            + str(GLAB_SERVICE_NAME)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_release",
+            release_tag=str(release_json["tag_name"]),
+            project_id=str(project_id),
+            project_name=str(GLAB_SERVICE_NAME),
         )
+        structured_logger.info("Log events sent for release", context)
     except Exception as e:
-        print(
-            "Failed to obtain environments for project", project_id, " due to error ", e
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_release",
+            project_id=str(project_id),
+        )
+        structured_logger.error(
+            "Failed to obtain releases for project", context, exception=e
         )
 
 
@@ -493,10 +552,25 @@ async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
             else:
                 break
 
-        print("Number of releases found", str(len(releases)))
-        print(
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="get_releases",
+            project_id=str(project_id),
+        )
+        structured_logger.info(
+            "Number of releases found", context, release_count=len(releases)
+        )
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="get_releases",
+            project_id=str(project_id),
+        )
+        structured_logger.info(
             "Number of releases that matched export configuration",
-            str(releases_matching),
+            context,
+            matching_count=releases_matching,
         )
 
 
@@ -540,26 +614,34 @@ def parse_pipeline(data):
         global_logger._log(
             level=logging.INFO, msg=msg, extra=current_pipeline_attributes, args=""
         )
-        print(
-            "Metrics sent for pipeline: "
-            + str(pipeline_id)
-            + " - "
-            + "from project: "
-            + str(project_id)
-            + " - "
-            + str(GLAB_SERVICE_NAME)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_pipeline",
+            pipeline_id=str(pipeline_id),
+            project_id=str(project_id),
+            project_name=str(GLAB_SERVICE_NAME),
         )
-        print(
-            "Log events sent for pipeline: "
-            + str(pipeline_id)
-            + " - "
-            + "from project: "
-            + str(project_id)
-            + " - "
-            + str(GLAB_SERVICE_NAME)
+        structured_logger.info("Metrics sent for pipeline", context)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_pipeline",
+            pipeline_id=str(pipeline_id),
+            project_id=str(project_id),
+            project_name=str(GLAB_SERVICE_NAME),
         )
+        structured_logger.info("Log events sent for pipeline", context)
     except Exception as e:
-        print("Failed to obtain pipelines for project", project_id, " due to error ", e)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_pipeline",
+            project_id=str(project_id),
+        )
+        structured_logger.error(
+            "Failed to obtain pipelines for project", context, exception=e
+        )
 
 
 def grab_pipeline_data(pipelineobject, current_project, project_id, GLAB_SERVICE_NAME):
@@ -569,11 +651,13 @@ def grab_pipeline_data(pipelineobject, current_project, project_id, GLAB_SERVICE
 
 
 async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
-    print(
-        "Gathering pipeline data for project "
-        + str(project_id)
-        + " this may take while..."
+    context = LogContext(
+        service_name="gitlab-metrics-exporter",
+        component="get-resources",
+        operation="get_pipelines",
+        project_id=str(project_id),
     )
+    structured_logger.info("Gathering pipeline data for project", context)
     pipelines = current_project.pipelines.list(
         iterator=True,
         per_page=100,
@@ -584,13 +668,16 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
             )
         ),
     )
-    print(
-        "Found",
-        len(pipelines),
-        "pipelines",
-        "in project",
-        project_id,
-        "processsing please wait...",
+    context = LogContext(
+        service_name="gitlab-metrics-exporter",
+        component="get-resources",
+        operation="get_pipelines",
+        project_id=str(project_id),
+    )
+    structured_logger.info(
+        "Found pipelines in project, processing",
+        context,
+        pipeline_count=len(pipelines),
     )
     if len(pipelines) > 0:  # check if there are pipelines in this project
         # setting workers to 5 due to gitlab api limits
@@ -648,29 +735,37 @@ def parse_job(data):
         global_logger._log(
             level=logging.INFO, msg=msg, extra=current_job_attributes, args=""
         )
-        print(
-            "Metrics sent for job: "
-            + str(job_json["id"])
-            + " for pipeline: "
-            + str(current_pipeline_json["id"])
-            + " from project: "
-            + str(project_id)
-            + " - "
-            + str(GLAB_SERVICE_NAME)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_job",
+            job_id=str(job_json["id"]),
+            pipeline_id=str(current_pipeline_json["id"]),
+            project_id=str(project_id),
+            project_name=str(GLAB_SERVICE_NAME),
         )
-        print(
-            "Log events sent for job: "
-            + str(job_json["id"])
-            + " for pipeline: "
-            + str(current_pipeline_json["id"])
-            + " from project: "
-            + str(project_id)
-            + " - "
-            + str(GLAB_SERVICE_NAME)
+        structured_logger.info("Metrics sent for job", context)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_job",
+            job_id=str(job_json["id"]),
+            pipeline_id=str(current_pipeline_json["id"]),
+            project_id=str(project_id),
+            project_name=str(GLAB_SERVICE_NAME),
         )
+        structured_logger.info("Log events sent for job", context)
 
     except Exception as e:
-        print("Failed to obtain jobs for project", project_id, " due to error ", e)
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="parse_job",
+            project_id=str(project_id),
+        )
+        structured_logger.error(
+            "Failed to obtain jobs for project", context, exception=e
+        )
 
 
 def get_jobs(pipelineobject, current_project, project_id, GLAB_SERVICE_NAME):

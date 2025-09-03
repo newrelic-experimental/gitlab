@@ -49,9 +49,13 @@ class TestMainFunction:
         mock_exporter.export_pipeline_data.assert_called_once()
 
     @patch("new_relic_exporter.main.GitLabExporter")
-    @patch("builtins.print")
-    def test_main_prints_status(self, mock_print, mock_exporter_class):
-        """Test that main function prints status messages."""
+    @patch("new_relic_exporter.main.get_logger")
+    def test_main_prints_status(self, mock_get_logger, mock_exporter_class):
+        """Test that main function logs status messages."""
+        # Setup mock logger
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+
         # Setup mock exporter
         mock_exporter = MagicMock()
         mock_exporter_class.return_value = mock_exporter
@@ -61,9 +65,15 @@ class TestMainFunction:
 
         main()
 
-        # Verify status messages were printed
-        mock_print.assert_any_call("Starting GitLab New Relic Exporter")
-        mock_print.assert_any_call("GitLab New Relic Exporter completed successfully")
+        # Verify status messages were logged
+        mock_logger.info.assert_any_call(
+            "Starting GitLab New Relic Exporter",
+            mock_logger.info.call_args_list[0][0][1],
+        )
+        mock_logger.info.assert_any_call(
+            "GitLab New Relic Exporter completed successfully",
+            mock_logger.info.call_args_list[1][0][1],
+        )
 
     def test_main_module_execution(self):
         """Test that the module can be executed directly."""
@@ -121,23 +131,32 @@ class TestIntegration:
             mock_exporter.export_pipeline_data.assert_called_once()
 
     @patch("new_relic_exporter.main.GitLabExporter")
-    def test_main_missing_environment_variables(self, mock_exporter_class):
+    @patch("new_relic_exporter.main.get_logger")
+    def test_main_missing_environment_variables(
+        self, mock_get_logger, mock_exporter_class
+    ):
         """Test main function behavior with missing environment variables."""
+        # Setup mock logger
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+
         # Setup mock exporter
         mock_exporter = MagicMock()
         mock_exporter_class.return_value = mock_exporter
 
         # Clear environment variables
         with patch.dict(os.environ, {}, clear=True):
-            with patch("builtins.print") as mock_print:
-                # Import and run main
-                from new_relic_exporter.main import main
+            # Import and run main
+            from new_relic_exporter.main import main
 
-                # Should complete (the exporter handles missing vars gracefully)
-                main()
+            # Should complete (the exporter handles missing vars gracefully)
+            main()
 
-                # Verify it attempted to start
-                mock_print.assert_any_call("Starting GitLab New Relic Exporter")
-                # Verify exporter was created and called
-                mock_exporter_class.assert_called_once()
-                mock_exporter.export_pipeline_data.assert_called_once()
+            # Verify it attempted to start
+            mock_logger.info.assert_any_call(
+                "Starting GitLab New Relic Exporter",
+                mock_logger.info.call_args_list[0][0][1],
+            )
+            # Verify exporter was created and called
+            mock_exporter_class.assert_called_once()
+            mock_exporter.export_pipeline_data.assert_called_once()
