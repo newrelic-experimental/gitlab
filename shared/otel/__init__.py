@@ -16,28 +16,9 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 def create_resource_attributes(atts, GLAB_SERVICE_NAME):
     attributes = {SERVICE_NAME: GLAB_SERVICE_NAME}
 
-    # List of problematic attributes to filter out
-    problematic_attrs = {
-        "taskName",
-        "task_name",
-        "TASK_NAME",
-        "CICD_PIPELINE_TASK_NAME",
-        "CI_PIPELINE_TASK_NAME",
-        "CI_TASK_NAME",
-        "CI_JOB_TASK_NAME",
-        "GITLAB_TASK_NAME",
-        "PIPELINE_TASK_NAME",
-        "JOB_TASK_NAME",
-    }
-
     for att in atts:
-        # Filter out None values, empty strings, and problematic attributes
-        if (
-            atts[att] is not None
-            and atts[att] != ""
-            and atts[att] != "None"
-            and att not in problematic_attrs
-        ):
+        # Only filter out None values and empty strings - rely on do_parse() for validation
+        if atts[att] is not None and atts[att] != "" and atts[att] != "None":
             if att != "name":
                 attributes[att] = atts[att]
             else:
