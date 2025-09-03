@@ -129,8 +129,13 @@ def grab_span_att_vars():
 
 
 def parse_attributes(obj):
+    """
+    Simple attribute parser that flattens GitLab job data into key-value pairs.
+    Uses do_parse() to filter out None, empty, and invalid values.
+    """
     obj_atts = {}
     attributes_to_drop = [""]
+
     if "GLAB_ATTRIBUTES_DROP" in os.environ:
         try:
             if os.getenv("GLAB_ATTRIBUTES_DROP") != "":
@@ -144,168 +149,9 @@ def parse_attributes(obj):
 
     for attribute in obj:
         attribute_name = str(attribute).lower()
-        if attribute_name not in attributes_to_drop:
-            if do_parse(obj[attribute]):
-                if type(obj[attribute]) is dict:
-                    for sub_att in obj[attribute]:
-                        attribute_name = do_string(attribute) + "." + do_string(sub_att)
-                        if attribute_name not in attributes_to_drop:
-                            if type(obj[attribute][sub_att]) is dict:
-                                for att in obj[attribute][sub_att]:
-                                    attribute_name = (
-                                        do_string(attribute)
-                                        + "."
-                                        + do_string(sub_att)
-                                        + "."
-                                        + do_string(att)
-                                    )
-                                    if attribute_name not in attributes_to_drop:
-                                        if GLAB_CONVERT_TO_TIMESTAMP:
-                                            if search("_at|_date", attribute_name):
-                                                if do_parse(
-                                                    str(obj[attribute][sub_att][att])
-                                                ):
-                                                    obj_atts[attribute_name] = do_time(
-                                                        str(
-                                                            obj[attribute][sub_att][att]
-                                                        )
-                                                    )
-                                                else:
-                                                    obj_atts[attribute_name] = str(
-                                                        obj[attribute][sub_att][att]
-                                                    )
-                                            else:
-                                                obj_atts[attribute_name] = str(
-                                                    obj[attribute][sub_att][att]
-                                                )
-                                        else:
-                                            obj_atts[attribute_name] = str(
-                                                obj[attribute][sub_att][att]
-                                            )
+        if attribute_name not in attributes_to_drop and do_parse(obj[attribute]):
+            obj_atts[attribute_name] = str(obj[attribute])
 
-                            elif type(obj[attribute][sub_att]) is list:
-                                for key in obj[attribute][sub_att]:
-                                    if type(key) is dict:
-                                        for att in key:
-                                            if do_parse(key[att]):
-                                                attribute_name = (
-                                                    do_string(attribute)
-                                                    + "."
-                                                    + do_string(sub_att)
-                                                    + "."
-                                                    + do_string(att)
-                                                )
-                                                if (
-                                                    attribute_name
-                                                    not in attributes_to_drop
-                                                ):
-                                                    if GLAB_CONVERT_TO_TIMESTAMP:
-                                                        if search(
-                                                            "_at|_date", attribute_name
-                                                        ):
-                                                            if do_parse(str(key[att])):
-                                                                obj_atts[
-                                                                    attribute_name
-                                                                ] = do_time(
-                                                                    str(key[att])
-                                                                )
-                                                            else:
-                                                                obj_atts[
-                                                                    attribute_name
-                                                                ] = str(key[att])
-                                                        else:
-                                                            obj_atts[attribute_name] = (
-                                                                str(key[att])
-                                                            )
-                                                    else:
-                                                        obj_atts[attribute_name] = str(
-                                                            key[att]
-                                                        )
-
-                                    else:
-                                        attribute_name = (
-                                            do_string(attribute)
-                                            + "."
-                                            + do_string(sub_att)
-                                        )
-                                        if attribute_name not in attributes_to_drop:
-                                            if GLAB_CONVERT_TO_TIMESTAMP:
-                                                if search("_at|_date", attribute_name):
-                                                    if do_parse(str(key)):
-                                                        obj_atts[attribute_name] = (
-                                                            do_time(str(key))
-                                                        )
-                                                    else:
-                                                        obj_atts[attribute_name] = str(
-                                                            key
-                                                        )
-                                                else:
-                                                    obj_atts[attribute_name] = str(key)
-                                            else:
-                                                obj_atts[attribute_name] = str(key)
-                            else:
-                                attribute_name = (
-                                    do_string(attribute) + "." + do_string(sub_att)
-                                )
-                                if attribute_name not in attributes_to_drop:
-                                    if GLAB_CONVERT_TO_TIMESTAMP:
-                                        if search("_at|_date", attribute_name):
-                                            if do_parse(str(obj[attribute][sub_att])):
-                                                obj_atts[attribute_name] = do_time(
-                                                    str(obj[attribute][sub_att])
-                                                )
-                                            else:
-                                                obj_atts[attribute_name] = str(
-                                                    obj[attribute][sub_att]
-                                                )
-                                        else:
-                                            obj_atts[attribute_name] = str(
-                                                obj[attribute][sub_att]
-                                            )
-                                    else:
-                                        obj_atts[attribute_name] = str(
-                                            obj[attribute][sub_att]
-                                        )
-
-                elif type(obj[attribute]) is list:
-                    for key in obj[attribute]:
-                        if type(key) is dict:
-                            for att in key:
-                                if do_parse(key[att]):
-                                    attribute_name = (
-                                        do_string(attribute) + "." + do_string(att)
-                                    )
-                                    if attribute_name not in attributes_to_drop:
-                                        if GLAB_CONVERT_TO_TIMESTAMP:
-                                            if search("_at|_date", attribute_name):
-                                                if do_parse(str(key[att])):
-                                                    obj_atts[attribute_name] = do_time(
-                                                        str(key[att])
-                                                    )
-                                                else:
-                                                    obj_atts[attribute_name] = str(
-                                                        key[att]
-                                                    )
-                                            else:
-                                                obj_atts[attribute_name] = str(key[att])
-                                        else:
-                                            obj_atts[attribute_name] = str(key[att])
-                else:
-                    if do_parse(obj[attribute]):
-                        attribute_name = do_string(attribute)
-                        if attribute_name not in attributes_to_drop:
-                            if GLAB_CONVERT_TO_TIMESTAMP:
-                                if search("_at|_date", attribute_name):
-                                    if do_parse(str(obj[attribute])):
-                                        obj_atts[attribute_name] = do_time(
-                                            str(obj[attribute])
-                                        )
-                                    else:
-                                        obj_atts[attribute_name] = str(obj[attribute])
-                                else:
-                                    obj_atts[attribute_name] = str(obj[attribute])
-                            else:
-                                obj_atts[attribute_name] = str(obj[attribute])
     return obj_atts
 
 
