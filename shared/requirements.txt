@@ -24,7 +24,7 @@ regex==2023.10.3
 pandas>=2.2.0
 
 # HTTP requests
-requests==2.31.0
+requests==2.32.4
 
 # Structured logging
 structlog==23.2.0
