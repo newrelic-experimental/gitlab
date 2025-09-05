@@ -106,7 +106,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:2.0.0
+    name: docker.io/dpacheconr/gitlab-exporter:2.0.1
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
@@ -175,19 +175,8 @@ python3 -m pytest tests/ --cov=shared --cov=new_relic_exporter --cov=new_relic_m
 
 1. **GitLab Access Token**: Create a GitLab personal access token with `read_api` scope
 2. **New Relic License Key**: Get your New Relic license key from your account settings
-3. **Docker** (recommended) or Python 3.8+ environment
 
-### Option 1: Docker Deployment (Recommended)
-
-#### New Relic Exporter (Pipeline-level tracing)
-```bash
-# Run as part of your GitLab CI/CD pipeline
-docker run \
-  -e GLAB_TOKEN="your_gitlab_token" \
-  -e NEW_RELIC_API_KEY="your_newrelic_key" \
-  -e GLAB_ENDPOINT="https://gitlab.com" \
-  docker.io/dpacheconr/gitlab-exporter:2.0.0
-```
+### Option 1: Docker Deployment
 
 #### New Relic Metrics Exporter (Standalone monitoring)
 ```bash
@@ -198,7 +187,7 @@ docker run \
   -e GLAB_EXPORT_PROJECTS_REGEX=".*" \
   -e GLAB_TOKEN="your_gitlab_token" \
   -e NEW_RELIC_API_KEY="your_newrelic_key" \
-  docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0
+  docker.io/dpacheconr/gitlab-metrics-exporter:2.0.1
 ```
 
 ### Option 2: GitLab CI/CD Integration
@@ -209,7 +198,7 @@ Add to your `.gitlab-ci.yml`:
 # For pipeline tracing
 new-relic-export:
   stage: .post
-  image: docker.io/dpacheconr/gitlab-exporter:2.0.0
+  image: docker.io/dpacheconr/gitlab-exporter:2.0.1
   script:
     - python3 -u /app/main.py
   variables:
@@ -219,7 +208,7 @@ new-relic-export:
 
 # For metrics collection (scheduled pipeline)
 new-relic-metrics:
-  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0
+  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.0.1
   script:
     - python3 -u /app/main.py
   variables:
@@ -235,8 +224,8 @@ new-relic-metrics:
 - **New Relic Quickstart**: https://newrelic.com/instant-observability/gitlab
 - **Blog Tutorial**: https://newrelic.com/blog/how-to-relic/monitor-gitlab-with-opentelemetry
 - **Docker Images**: 
-  - `docker.io/dpacheconr/gitlab-exporter:2.0.0`
-  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.0.0`
+  - `docker.io/dpacheconr/gitlab-exporter:2.0.1`
+  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.0.1`
 
 ### Health Monitoring
 
