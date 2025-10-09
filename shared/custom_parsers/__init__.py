@@ -4,6 +4,12 @@ import sys
 from pyrfc3339 import parse
 import os
 from re import search
+import logging
+
+# Use standard logging for module-level logger to avoid circular dependencies
+logger = logging.getLogger(__name__)
+
+# Import structured logger components for use in functions
 from shared.logging.structured_logger import get_logger, LogContext
 
 GLAB_CONVERT_TO_TIMESTAMP = False
@@ -19,7 +25,46 @@ else:
 
 
 def do_time(string):
-    return int(round(time.mktime(parse(string).timetuple())) * 1000000000)
+    """
+    Parse RFC 3339 timestamp string to nanoseconds since epoch.
+    Returns None if the timestamp is invalid or null.
+    """
+    if not string or string == "null" or string == "None" or string.lower() == "none":
+        logger.debug(f"Timestamp is null or empty: '{string}'")
+        return None
+    try:
+        parsed_time = parse(string)
+        timestamp_ns = int(round(time.mktime(parsed_time.timetuple())) * 1000000000)
+        logger.debug(
+            f"Successfully parsed timestamp '{string}' to {timestamp_ns} nanoseconds"
+        )
+        return timestamp_ns
+    except ValueError as e:
+        logger.warning(
+            f"ValueError parsing timestamp - "
+            f"input: '{string}', "
+            f"type: {type(string).__name__}, "
+            f"length: {len(str(string))}, "
+            f"error: {e}"
+        )
+        return None
+    except TypeError as e:
+        logger.warning(
+            f"TypeError parsing timestamp - "
+            f"input: '{string}', "
+            f"type: {type(string).__name__}, "
+            f"error: {e}"
+        )
+        return None
+    except Exception as e:
+        logger.error(
+            f"Unexpected error parsing timestamp - "
+            f"input: '{string}', "
+            f"type: {type(string).__name__}, "
+            f"exception_type: {type(e).__name__}, "
+            f"error: {e}"
+        )
+        return None
 
 
 def do_string(string):

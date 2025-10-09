@@ -194,19 +194,72 @@ class PipelineProcessor(BaseProcessor):
 
     def finalize_pipeline(self, pipeline_span: trace.Span):
         """
-        Finalize the pipeline span with end time.
+        Finalize the pipeline span with proper end time handling.
+        Falls back to current time if finished_at is invalid or null.
 
         Args:
             pipeline_span: The pipeline span to finalize
         """
         if pipeline_span:
-            pipeline_span.end(end_time=do_time(str(self.pipeline_json["finished_at"])))
+            pipeline_id = self.pipeline_json.get("id", "unknown")
+            pipeline_status = self.pipeline_json.get("status", "unknown")
+            finished_at = self.pipeline_json.get("finished_at")
+
             context = LogContext(
                 service_name="gitlab-exporter",
                 component="pipeline-processor",
                 operation="finalize_pipeline",
-                pipeline_id=str(self.pipeline_json["id"]),
+                pipeline_id=str(pipeline_id),
             )
+
+            self.logger.debug(
+                f"Finalizing pipeline - "
+                f"id: {pipeline_id}, "
+                f"status: {pipeline_status}, "
+                f"finished_at: '{finished_at}', "
+                f"finished_at_type: {type(finished_at).__name__}",
+                context,
+            )
+
+            end_time = None
+
+            if finished_at:
+                end_time = do_time(str(finished_at))
+
+            if end_time:
+                pipeline_span.end(end_time=end_time)
+                self.logger.debug(
+                    f"Pipeline {pipeline_id} finalized with actual finished_at timestamp: {end_time} nanoseconds "
+                    f"({finished_at}). Data will be ingested to New Relic with correct timestamp.",
+                    context,
+                )
+            else:
+                # Pipeline hasn't finished yet or has invalid timestamp
+                # Use current time as fallback - span.end() without time parameter uses current time
+                pipeline_span.end()
+
+                if finished_at:
+                    self.logger.warning(
+                        f"Pipeline {pipeline_id} has invalid finished_at timestamp - "
+                        f"value: '{finished_at}', "
+                        f"type: {type(finished_at).__name__}, "
+                        f"status: {pipeline_status}. "
+                        f"Using CURRENT TIME as fallback. "
+                        f"Data WILL BE INGESTED to New Relic but with current timestamp instead of actual finish time. "
+                        f"This may affect time-based queries and dashboards. "
+                        f"Full pipeline data: {self.pipeline_json}",
+                        context,
+                    )
+                else:
+                    self.logger.info(
+                        f"Pipeline {pipeline_id} has no finished_at timestamp - "
+                        f"status: {pipeline_status}, "
+                        f"likely still running or pending. "
+                        f"Using CURRENT TIME for span end. "
+                        f"Data WILL BE INGESTED to New Relic with current timestamp.",
+                        context,
+                    )
+
             self.logger.debug(
                 "All data sent to New Relic for pipeline",
                 context,
