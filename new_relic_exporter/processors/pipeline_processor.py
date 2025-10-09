@@ -229,12 +229,13 @@ class PipelineProcessor(BaseProcessor):
             if end_time:
                 pipeline_span.end(end_time=end_time)
                 self.logger.debug(
-                    f"Pipeline {pipeline_id} finalized with end_time: {end_time}",
+                    f"Pipeline {pipeline_id} finalized with actual finished_at timestamp: {end_time} nanoseconds "
+                    f"({finished_at}). Data will be ingested to New Relic with correct timestamp.",
                     context,
                 )
             else:
                 # Pipeline hasn't finished yet or has invalid timestamp
-                # Use current time as fallback
+                # Use current time as fallback - span.end() without time parameter uses current time
                 pipeline_span.end()
 
                 if finished_at:
@@ -242,8 +243,10 @@ class PipelineProcessor(BaseProcessor):
                         f"Pipeline {pipeline_id} has invalid finished_at timestamp - "
                         f"value: '{finished_at}', "
                         f"type: {type(finished_at).__name__}, "
-                        f"status: {pipeline_status}, "
-                        f"using current time instead. "
+                        f"status: {pipeline_status}. "
+                        f"Using CURRENT TIME as fallback. "
+                        f"Data WILL BE INGESTED to New Relic but with current timestamp instead of actual finish time. "
+                        f"This may affect time-based queries and dashboards. "
                         f"Full pipeline data: {self.pipeline_json}",
                         context,
                     )
@@ -251,7 +254,9 @@ class PipelineProcessor(BaseProcessor):
                     self.logger.info(
                         f"Pipeline {pipeline_id} has no finished_at timestamp - "
                         f"status: {pipeline_status}, "
-                        f"likely still running or pending",
+                        f"likely still running or pending. "
+                        f"Using CURRENT TIME for span end. "
+                        f"Data WILL BE INGESTED to New Relic with current timestamp.",
                         context,
                     )
 
