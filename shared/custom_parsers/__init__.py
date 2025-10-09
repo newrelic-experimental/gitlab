@@ -4,9 +4,13 @@ import sys
 from pyrfc3339 import parse
 import os
 from re import search
-from shared.logging.structured_logger import get_logger, LogContext
+import logging
 
-logger = get_logger(__name__)
+# Use standard logging for module-level logger to avoid circular dependencies
+logger = logging.getLogger(__name__)
+
+# Import structured logger components for use in functions
+from shared.logging.structured_logger import get_logger, LogContext
 
 GLAB_CONVERT_TO_TIMESTAMP = False
 
@@ -31,7 +35,9 @@ def do_time(string):
     try:
         parsed_time = parse(string)
         timestamp_ns = int(round(time.mktime(parsed_time.timetuple())) * 1000000000)
-        logger.debug(f"Successfully parsed timestamp '{string}' to {timestamp_ns} nanoseconds")
+        logger.debug(
+            f"Successfully parsed timestamp '{string}' to {timestamp_ns} nanoseconds"
+        )
         return timestamp_ns
     except ValueError as e:
         logger.warning(

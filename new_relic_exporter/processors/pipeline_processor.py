@@ -201,39 +201,42 @@ class PipelineProcessor(BaseProcessor):
             pipeline_span: The pipeline span to finalize
         """
         if pipeline_span:
-            pipeline_id = self.pipeline_json.get('id', 'unknown')
-            pipeline_status = self.pipeline_json.get('status', 'unknown')
+            pipeline_id = self.pipeline_json.get("id", "unknown")
+            pipeline_status = self.pipeline_json.get("status", "unknown")
             finished_at = self.pipeline_json.get("finished_at")
-            
+
             context = LogContext(
                 service_name="gitlab-exporter",
                 component="pipeline-processor",
                 operation="finalize_pipeline",
                 pipeline_id=str(pipeline_id),
             )
-            
+
             self.logger.debug(
                 f"Finalizing pipeline - "
                 f"id: {pipeline_id}, "
                 f"status: {pipeline_status}, "
                 f"finished_at: '{finished_at}', "
                 f"finished_at_type: {type(finished_at).__name__}",
-                context
+                context,
             )
-            
+
             end_time = None
-            
+
             if finished_at:
                 end_time = do_time(str(finished_at))
-            
+
             if end_time:
                 pipeline_span.end(end_time=end_time)
-                self.logger.debug(f"Pipeline {pipeline_id} finalized with end_time: {end_time}", context)
+                self.logger.debug(
+                    f"Pipeline {pipeline_id} finalized with end_time: {end_time}",
+                    context,
+                )
             else:
                 # Pipeline hasn't finished yet or has invalid timestamp
                 # Use current time as fallback
                 pipeline_span.end()
-                
+
                 if finished_at:
                     self.logger.warning(
                         f"Pipeline {pipeline_id} has invalid finished_at timestamp - "
@@ -242,16 +245,16 @@ class PipelineProcessor(BaseProcessor):
                         f"status: {pipeline_status}, "
                         f"using current time instead. "
                         f"Full pipeline data: {self.pipeline_json}",
-                        context
+                        context,
                     )
                 else:
                     self.logger.info(
                         f"Pipeline {pipeline_id} has no finished_at timestamp - "
                         f"status: {pipeline_status}, "
                         f"likely still running or pending",
-                        context
+                        context,
                     )
-            
+
             self.logger.debug(
                 "All data sent to New Relic for pipeline",
                 context,
