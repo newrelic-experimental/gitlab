@@ -81,10 +81,10 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_ENDPOINT` | Gitlab API endpoint | True | String | "https://gitlab.com" |
 | `GLAB_TOKEN` | MASKED - Token to access gitlab API | False | String | None |
 | `NEW_RELIC_API_KEY` | MASKED - New Relic License Key | False | String | None |
-| `GLAB_PROJECT_OWNERSHIP` | Project ownership | False | String | True |
+| `GLAB_PROJECT_OWNERSHIP` | Filter projects by ownership. Set to "true" to get only owned projects, "false" to get all accessible projects | True | Boolean | True |
 | `GLAB_PROJECT_VISIBILITIES` | Project visibilities (public,private,internal) | False | List* | private |
 | `GLAB_DORA_METRICS` | Export DORA metrics, requires Gitlab ULTIMATE | True | Bool | False |
-| `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from | False | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
+| `GLAB_EXPORT_PATHS` | Project paths aka namespace full_path to obtain data from. Use this to filter by specific groups/namespaces (e.g., "my-group,another-group") | True | List* | None if running as standalone or CI_PROJECT_ROOT_NAMESPACE if running as pipeline schedule|
 | `GLAB_RUNNERS_INSTANCE` | Obtain runners from gitlab instance instead of project only  | True | String | |
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against ".*" for all | False | Boolean | None |
 | `GLAB_EXPORT_PATHS_ALL` | When True ignore GLAB_EXPORT_PATHS variable and export projects matching GLAB_EXPORT_PROJECTS_REGEX in any groups or subgroups| True |  Boolean | False |
@@ -106,7 +106,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:2.0.1
+    name: docker.io/dpacheconr/gitlab-exporter:2.0.2
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
@@ -187,7 +187,7 @@ docker run \
   -e GLAB_EXPORT_PROJECTS_REGEX=".*" \
   -e GLAB_TOKEN="your_gitlab_token" \
   -e NEW_RELIC_API_KEY="your_newrelic_key" \
-  docker.io/dpacheconr/gitlab-metrics-exporter:2.0.1
+  docker.io/dpacheconr/gitlab-metrics-exporter:2.0.2
 ```
 
 ### Option 2: GitLab CI/CD Integration
@@ -198,7 +198,7 @@ Add to your `.gitlab-ci.yml`:
 # For pipeline tracing
 new-relic-export:
   stage: .post
-  image: docker.io/dpacheconr/gitlab-exporter:2.0.1
+  image: docker.io/dpacheconr/gitlab-exporter:2.0.2
   script:
     - python3 -u /app/main.py
   variables:
@@ -208,7 +208,7 @@ new-relic-export:
 
 # For metrics collection (scheduled pipeline)
 new-relic-metrics:
-  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.0.1
+  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.0.2
   script:
     - python3 -u /app/main.py
   variables:
@@ -224,8 +224,8 @@ new-relic-metrics:
 - **New Relic Quickstart**: https://newrelic.com/instant-observability/gitlab
 - **Blog Tutorial**: https://newrelic.com/blog/how-to-relic/monitor-gitlab-with-opentelemetry
 - **Docker Images**: 
-  - `docker.io/dpacheconr/gitlab-exporter:2.0.1`
-  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.0.1`
+  - `docker.io/dpacheconr/gitlab-exporter:2.0.2`
+  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.0.2`
 
 ### Health Monitoring
 
@@ -247,17 +247,26 @@ Both exporters include comprehensive health monitoring and structured logging:
 
 ### Common Issues
 
-1. **Authentication Errors**
+1. **Authentication Errors (401 Unauthorized)**
+   - **Problem**: `GitLabAPIError: Failed to retrieve projects for visibility private`
+   - **Cause**: Incorrect `GLAB_PROJECT_OWNERSHIP` configuration
+   - **Solution**: Use `GLAB_PROJECT_OWNERSHIP: "false"` and filter by namespace using `GLAB_EXPORT_PATHS: "your-group-name"`
    - Verify GitLab token has `read_api` scope
    - Check New Relic license key format
    - Ensure correct GitLab endpoint URL
 
-2. **No Data in New Relic**
+2. **No Projects Found**
+   - **Problem**: "No projects found to export" in logs
+   - **Cause**: Incorrect namespace filtering configuration
+   - **Solution**: Check that `GLAB_EXPORT_PATHS` matches your GitLab group/namespace exactly
+   - Use `GLAB_EXPORT_PATHS_ALL: "true"` to export all accessible projects for testing
+
+3. **No Data in New Relic**
    - Verify OTEL endpoint is correct for your region
    - Check network connectivity to New Relic
    - Review structured logs for export errors
 
-3. **Performance Issues**
+4. **Performance Issues**
    - Use `GLAB_LOW_DATA_MODE=True` for testing
    - Adjust `GLAB_EXPORT_LAST_MINUTES` for metrics exporter
    - Consider excluding jobs with `GLAB_EXCLUDE_JOBS`
