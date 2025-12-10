@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: new_relic_metrics_exporter/Dockerfile
-    image: ghcr.io/newrelic-experimental/gitlab-metrics-exporter:$VERSION
+    image: docker.io/dpacheconr/gitlab-metrics-exporter:$VERSION
     platform: linux/amd64
   new_relic_exporter:
     environment:
@@ -13,5 +13,5 @@ services:
     build:
       context: .
       dockerfile: new_relic_exporter/Dockerfile
-    image: ghcr.io/newrelic-experimental/gitlab-exporter:$VERSION
+    image: docker.io/dpacheconr/gitlab-exporter:$VERSION
     platform: linux/amd64
