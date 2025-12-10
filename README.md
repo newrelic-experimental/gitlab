@@ -43,6 +43,9 @@ This project consists of two main components:
 - **Data Type**: Metrics, project statistics, and runner information
 - **Use Case**: High-level monitoring and alerting across multiple projects
 - **Deployment**: Can run standalone or as scheduled GitLab pipeline
+- **Data Collection**: 
+  - Project metadata export is configurable via `GLAB_EXPORT_ALL_PROJECTS` (default: exports all projects as a snapshot)
+  - Event data (pipelines, jobs, deployments, releases) is filtered by `GLAB_EXPORT_LAST_MINUTES` to collect only recent activity
 
 ## Configuration System
 
@@ -89,7 +92,8 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_EXPORT_PROJECTS_REGEX` | Regex to match project names against ".*" for all | False | Boolean | None |
 | `GLAB_EXPORT_PATHS_ALL` | When True ignore GLAB_EXPORT_PATHS variable and export projects matching GLAB_EXPORT_PROJECTS_REGEX in any groups or subgroups| True |  Boolean | False |
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
-| `GLAB_EXPORT_LAST_MINUTES` | The amount past minutes to export data from | True | Integer | 60 |
+| `GLAB_EXPORT_LAST_MINUTES` | Time window (in minutes) for collecting event data (pipelines, jobs, deployments, releases). When GLAB_EXPORT_ALL_PROJECTS=False, also applies to project metadata. | True | Integer | 60 |
+| `GLAB_EXPORT_ALL_PROJECTS` | When True, always export all project metadata regardless of last activity. When False, only export projects with activity within GLAB_EXPORT_LAST_MINUTES window (legacy behavior). | True | Boolean | True |
 | `GLAB_ATTRIBUTES_DROP` | Attributes to drop from logs and spans events | True | List* | None |
 | `GLAB_DIMENSION_METRICS` | Extra dimensional metric attributes to add to each metric | True | List* | NONE Note the following attributes will always be set as dimensions regardless of this setting: status,stage,name |
 | `GLAB_RUNNERS_SCOPE` | Get runners scope : all, active, paused, online, shared, specific (separated by comma) | True | List* | all |
@@ -106,7 +110,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:2.0.2
+    name: ghcr.io/newrelic-experimental/gitlab-exporter:2.1.0
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
@@ -173,7 +177,9 @@ python3 -m pytest tests/ --cov=shared --cov=new_relic_exporter --cov=new_relic_m
 
 ### Prerequisites
 
-1. **GitLab Access Token**: Create a GitLab personal access token with `read_api` scope
+1. **GitLab Access Token**: Create a GitLab access token with `read_api` scope
+   - **Personal Access Token (PAT)**: Create a personal access token with `read_api` scope
+   - **Group Access Token**: If using a group access token (for non-user-based authentication), it must be created with the **Owner** role to access all data including Runner metrics. Note: Maintainer role will provide partial data but will not include Runner information.
 2. **New Relic License Key**: Get your New Relic license key from your account settings
 
 ### Option 1: Docker Deployment
@@ -187,7 +193,7 @@ docker run \
   -e GLAB_EXPORT_PROJECTS_REGEX=".*" \
   -e GLAB_TOKEN="your_gitlab_token" \
   -e NEW_RELIC_API_KEY="your_newrelic_key" \
-  docker.io/dpacheconr/gitlab-metrics-exporter:2.0.2
+  ghcr.io/newrelic-experimental/gitlab-metrics-exporter:2.1.0
 ```
 
 ### Option 2: GitLab CI/CD Integration
@@ -198,7 +204,7 @@ Add to your `.gitlab-ci.yml`:
 # For pipeline tracing
 new-relic-export:
   stage: .post
-  image: docker.io/dpacheconr/gitlab-exporter:2.0.2
+  image: ghcr.io/newrelic-experimental/gitlab-exporter:2.1.0
   script:
     - python3 -u /app/main.py
   variables:
@@ -208,7 +214,7 @@ new-relic-export:
 
 # For metrics collection (scheduled pipeline)
 new-relic-metrics:
-  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.0.2
+  image: ghcr.io/newrelic-experimental/gitlab-metrics-exporter:2.1.0
   script:
     - python3 -u /app/main.py
   variables:
@@ -224,8 +230,9 @@ new-relic-metrics:
 - **New Relic Quickstart**: https://newrelic.com/instant-observability/gitlab
 - **Blog Tutorial**: https://newrelic.com/blog/how-to-relic/monitor-gitlab-with-opentelemetry
 - **Docker Images**: 
-  - `docker.io/dpacheconr/gitlab-exporter:2.0.2`
-  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.0.2`
+  - `ghcr.io/newrelic-experimental/gitlab-exporter:2.1.0`
+  - `ghcr.io/newrelic-experimental/gitlab-metrics-exporter:2.1.0`
+  - [View all available tags](https://github.com/orgs/newrelic-experimental/packages?repo_name=gitlab)
 
 ### Health Monitoring
 
@@ -241,7 +248,9 @@ Both exporters include comprehensive health monitoring and structured logging:
 - **Token Security**: All sensitive tokens are masked in logs
 - **Environment Variables**: Sensitive environment variables are automatically filtered
 - **HTTPS**: All New Relic endpoints use HTTPS by default
-- **Minimal Permissions**: GitLab tokens only require `read_api` scope
+- **Minimal Permissions**: GitLab tokens require `read_api` scope
+  - Personal Access Tokens (PAT): `read_api` scope is sufficient
+  - Group Access Tokens: Require **Owner** role for full data access (including Runner metrics); Maintainer role provides limited access without Runner data
 
 ## Troubleshooting
 
@@ -270,6 +279,16 @@ Both exporters include comprehensive health monitoring and structured logging:
    - Use `GLAB_LOW_DATA_MODE=True` for testing
    - Adjust `GLAB_EXPORT_LAST_MINUTES` for metrics exporter
    - Consider excluding jobs with `GLAB_EXCLUDE_JOBS`
+
+5. **Missing Runner Data**
+   - **Problem**: Runner metrics are not being exported
+   - **Cause**: Insufficient token permissions when using Group Access Token
+   - **Solution**: If using a Group Access Token, ensure it was created with the **Owner** role (not Maintainer). Personal Access Tokens with `read_api` scope do not have this limitation.
+
+6. **Missing Project Data (Standalone Deployment)**
+   - **Problem**: Projects without recent activity are not appearing on dashboards
+   - **Cause**: `GLAB_EXPORT_ALL_PROJECTS` is set to `false` or legacy deployment
+   - **Solution**: Set `GLAB_EXPORT_ALL_PROJECTS=true` (default since v2.1.0) to export all project metadata as a snapshot. Set to `false` only if you want the legacy behavior of time-filtered project exports.
 
 ### Debug Mode
 

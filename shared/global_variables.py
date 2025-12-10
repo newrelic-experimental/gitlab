@@ -9,6 +9,7 @@ check_env_vars()
 # global variables
 global GLAB_STANDALONE
 global GLAB_EXPORT_LAST_MINUTES
+global GLAB_EXPORT_ALL_PROJECTS
 global GLAB_PROJECT_OWNERSHIP
 global GLAB_PROJECT_VISIBILITIES
 global GLAB_SERVICE_NAME
@@ -34,6 +35,7 @@ GLAB_DORA_METRICS = False
 GLAB_EXPORT_LOGS = True
 GLAB_STANDALONE = False
 GLAB_EXPORT_LAST_MINUTES = 61
+GLAB_EXPORT_ALL_PROJECTS = True
 GLAB_PROJECT_OWNERSHIP = True
 GLAB_PROJECT_VISIBILITIES = [
     "private",
@@ -129,6 +131,13 @@ if "GLAB_STANDALONE" in os.environ and os.getenv("GLAB_STANDALONE").lower() == "
 # Check if we using default amount data to export
 if "GLAB_EXPORT_LAST_MINUTES" in os.environ:
     GLAB_EXPORT_LAST_MINUTES = int(os.getenv("GLAB_EXPORT_LAST_MINUTES")) + 1
+
+# Check if we should export all projects regardless of activity
+if (
+    "GLAB_EXPORT_ALL_PROJECTS" in os.environ
+    and os.getenv("GLAB_EXPORT_ALL_PROJECTS").lower() == "false"
+):
+    GLAB_EXPORT_ALL_PROJECTS = False
 
 # Check which datacentre we exporting our data to
 if "OTEL_EXPORTER_OTEL_ENDPOINT" in os.environ:

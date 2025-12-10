@@ -197,12 +197,18 @@ async def grab_data(project):
                         structured_logger.error(
                             "Unable to obtain DORA metrics", context, exception=e
                         )
-                # If we don't need to export all projects each time
-                if zulu.parse(project_json["last_activity_at"]) >= (
-                    datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
-                    - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
-                ):
-                    # Send project information as log events with attributes
+                # Export project metadata based on configuration
+                # When GLAB_EXPORT_ALL_PROJECTS=True (default): Always export all projects as a snapshot
+                # When GLAB_EXPORT_ALL_PROJECTS=False (legacy): Only export projects with recent activity
+                should_export_project = GLAB_EXPORT_ALL_PROJECTS or (
+                    zulu.parse(project_json["last_activity_at"])
+                    >= (
+                        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                        - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+                    )
+                )
+
+                if should_export_project:
                     c_attributes = create_resource_attributes(
                         parse_attributes(project_json), GLAB_SERVICE_NAME
                     )
