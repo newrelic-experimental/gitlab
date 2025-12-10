@@ -44,6 +44,7 @@ class GitLabConfig:
 
     # Time-based filtering
     export_last_minutes: int = 61
+    export_all_projects: bool = True
 
     # Runner settings
     runners_instance: bool = True
@@ -174,6 +175,7 @@ def load_config_from_env() -> GitLabConfig:
 
     # Time-based filtering
     export_last_minutes = int(os.getenv("GLAB_EXPORT_LAST_MINUTES", "60")) + 1
+    export_all_projects = _get_bool_env("GLAB_EXPORT_ALL_PROJECTS", True)
 
     # Runner settings
     runners_instance = _get_bool_env("GLAB_RUNNERS_INSTANCE", True)
@@ -206,6 +208,7 @@ def load_config_from_env() -> GitLabConfig:
         project_visibilities=project_visibilities,
         exclude_jobs=exclude_jobs,
         export_last_minutes=export_last_minutes,
+        export_all_projects=export_all_projects,
         runners_instance=runners_instance,
         runners_scope=runners_scope,
         otel_endpoint=otel_endpoint,
