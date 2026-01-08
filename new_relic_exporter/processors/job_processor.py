@@ -11,7 +11,7 @@ from typing import Dict, Any
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from opentelemetry.trace import Status, StatusCode
-from shared.custom_parsers import do_time, parse_attributes, do_parse
+from shared.custom_parsers import do_time, parse_attributes, do_parse, log_attributes_debug
 from shared.otel import create_resource_attributes, get_tracer, get_logger
 from shared.logging.structured_logger import (
     get_logger as get_structured_logger,
@@ -73,6 +73,9 @@ class JobProcessor(BaseProcessor):
             for key, value in resource_attributes.items()
             if value is not None and value != ""
         }
+
+        # Log attributes debug information
+        log_attributes_debug(filtered_resource_attributes, "JobProcessor.create_job_resource")
 
         return Resource(attributes=filtered_resource_attributes)
 
@@ -237,6 +240,8 @@ class JobProcessor(BaseProcessor):
                 # Set job attributes if not in low data mode
                 if not self.config.low_data_mode:
                     job_attributes = parse_attributes(job)
+                    # Log attributes debug information
+                    log_attributes_debug(job_attributes, "JobProcessor.process_job.set_attributes")
                     child.set_attributes(job_attributes)
 
                 # Handle job logs if enabled

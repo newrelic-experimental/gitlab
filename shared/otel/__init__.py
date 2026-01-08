@@ -1,6 +1,7 @@
 import logging
 
 from opentelemetry import metrics, trace
+from shared.custom_parsers import log_attributes_debug
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -23,6 +24,10 @@ def create_resource_attributes(atts, GLAB_SERVICE_NAME):
                 attributes[att] = atts[att]
             else:
                 attributes["resource.name"] = atts[att]
+
+    # Log attributes debug information
+    log_attributes_debug(attributes, "create_resource_attributes")
+
     return attributes
 
 

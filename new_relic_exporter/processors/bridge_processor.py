@@ -12,7 +12,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import Status, StatusCode
 from shared.config.settings import GitLabConfig
-from shared.custom_parsers import do_time, parse_attributes
+from shared.custom_parsers import do_time, parse_attributes, log_attributes_debug
 from shared.otel import get_tracer
 from shared.logging.structured_logger import get_logger, LogContext
 from .base_processor import BaseProcessor
@@ -74,6 +74,10 @@ class BridgeProcessor(BaseProcessor):
         }
 
         resource_attributes = self.create_resource_attributes(filtered_base_attributes)
+
+        # Log attributes debug information
+        log_attributes_debug(resource_attributes, "BridgeProcessor.create_bridge_resource")
+
         return Resource(attributes=resource_attributes)
 
     def get_bridge_downstream_info(
@@ -243,6 +247,8 @@ class BridgeProcessor(BaseProcessor):
                         for key, value in bridge_attributes.items()
                         if value is not None and value != ""
                     }
+                    # Log attributes debug information
+                    log_attributes_debug(filtered_attributes, "BridgeProcessor.process_bridge.set_attributes")
                     child.set_attributes(filtered_attributes)
 
                 # Add downstream pipeline information if available
@@ -254,6 +260,8 @@ class BridgeProcessor(BaseProcessor):
                         for key, value in downstream_info.items()
                         if value is not None and value != ""
                     }
+                    # Log attributes debug information
+                    log_attributes_debug(filtered_downstream_info, "BridgeProcessor.process_bridge.set_downstream_attributes")
                     child.set_attributes(filtered_downstream_info)
 
                 # Handle failed bridges
