@@ -5,7 +5,7 @@ from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler, LogLimits
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
@@ -60,18 +60,17 @@ def get_logger(endpoint, headers, resource, name):
     exporter = OTLPLogExporter(endpoint=endpoint, headers=headers)
     logger = logging.getLogger(str(name))
     logger.handlers.clear()
-    log_limits = LogLimits()
 
     # Debug: Log the attribute limits being applied
     attr_value_length_limit = os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "default")
     attr_count_limit = os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "default")
     logging.debug(
-        f"[LoggerProvider] Initializing with limits - "
+        f"[LoggerProvider] Initializing - respecting OTEL environment variables: "
         f"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT={attr_value_length_limit}, "
         f"OTEL_ATTRIBUTE_COUNT_LIMIT={attr_count_limit}"
     )
 
-    logger_provider = LoggerProvider(resource=resource, limits=log_limits)
+    logger_provider = LoggerProvider(resource=resource)
     logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
     handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
     logger.addHandler(handler)
