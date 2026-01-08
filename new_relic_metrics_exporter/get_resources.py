@@ -5,7 +5,7 @@ from typing import Dict, Any
 import pytz
 import zulu
 from opentelemetry.sdk.resources import Resource
-from shared.otel import get_logger, create_resource_attributes, get_meter
+from shared.otel import get_logger, create_resource_attributes, get_meter, log_attributes_debug
 from shared.custom_parsers import parse_attributes, parse_metrics_attributes, do_parse
 from opentelemetry.sdk.resources import SERVICE_NAME
 from shared.logging.structured_logger import (
@@ -88,6 +88,8 @@ def get_runners():
                         parse_attributes(runner_json), GLAB_SERVICE_NAME
                     )
                     runner_attributes.update({"gitlab.resource.type": "runner"})
+                    # Debug: Log attribute count and lengths before sending
+                    log_attributes_debug(runner_attributes, "get_runners")
                     # Send runner data as log events with attributes
                     msg = "Runner: " + str(runner_json["id"])
                     global_logger._log(
@@ -219,6 +221,8 @@ async def grab_data(project):
                         + " - "
                         + str(GLAB_SERVICE_NAME)
                     )
+                    # Debug: Log attribute count and lengths before sending
+                    log_attributes_debug(c_attributes, "grab_data_project")
                     global_logger._log(
                         level=logging.INFO, msg=msg, extra=c_attributes, args=""
                     )
@@ -610,6 +614,8 @@ def parse_pipeline(data):
             + " - "
             + str(GLAB_SERVICE_NAME)
         )
+        # Debug: Log attribute count and lengths before sending
+        log_attributes_debug(current_pipeline_attributes, "parse_pipeline")
         global_logger._log(
             level=logging.INFO, msg=msg, extra=current_pipeline_attributes, args=""
         )
@@ -731,6 +737,8 @@ def parse_job(data):
             + " - "
             + str(GLAB_SERVICE_NAME)
         )
+        # Debug: Log attribute count and lengths before sending
+        log_attributes_debug(current_job_attributes, "parse_job")
         global_logger._log(
             level=logging.INFO, msg=msg, extra=current_job_attributes, args=""
         )
