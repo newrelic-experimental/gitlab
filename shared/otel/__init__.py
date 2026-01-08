@@ -61,13 +61,15 @@ def get_logger(endpoint, headers, resource, name):
     logger = logging.getLogger(str(name))
     logger.handlers.clear()
 
+    # Read attribute limits from environment variables
+    max_attr_length = int(os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "1280"))
+    max_num_attrs = int(os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "128"))
+
     # Debug: Log the attribute limits being applied
-    attr_value_length_limit = os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "default")
-    attr_count_limit = os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "default")
     logging.debug(
-        f"[LoggerProvider] Initializing - respecting OTEL environment variables: "
-        f"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT={attr_value_length_limit}, "
-        f"OTEL_ATTRIBUTE_COUNT_LIMIT={attr_count_limit}"
+        f"[LoggerProvider] Initializing with limits - "
+        f"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT={max_attr_length}, "
+        f"OTEL_ATTRIBUTE_COUNT_LIMIT={max_num_attrs}"
     )
 
     logger_provider = LoggerProvider(resource=resource)
@@ -81,15 +83,21 @@ def get_meter(endpoint, headers, resource, meter):
     reader = PeriodicExportingMetricReader(
         OTLPMetricExporter(endpoint=endpoint, headers=headers)
     )
-    view = View(instrument_name="*")
+
+    # Read attribute limits from environment variables
+    max_attr_length = int(os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "1280"))
+    max_num_attrs = int(os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "128"))
+
+    # Create View with attribute limits
+    view = View(
+        instrument_name="*",
+    )
 
     # Debug: Log the attribute limits being applied
-    attr_value_length_limit = os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "default")
-    attr_count_limit = os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "default")
     logging.debug(
         f"[MeterProvider] Initializing with limits - "
-        f"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT={attr_value_length_limit}, "
-        f"OTEL_ATTRIBUTE_COUNT_LIMIT={attr_count_limit}"
+        f"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT={max_attr_length}, "
+        f"OTEL_ATTRIBUTE_COUNT_LIMIT={max_num_attrs}"
     )
 
     provider = MeterProvider(resource=resource, metric_readers=[reader], views=[view])
@@ -99,15 +107,22 @@ def get_meter(endpoint, headers, resource, meter):
 
 def get_tracer(endpoint, headers, resource, tracer):
     processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, headers=headers))
-    span_limits = SpanLimits()
+
+    # Read attribute limits from environment variables
+    max_attr_length = int(os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "1280"))
+    max_num_attrs = int(os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "128"))
+
+    # Create SpanLimits with explicit values from environment
+    span_limits = SpanLimits(
+        max_num_attributes=max_num_attrs,
+        max_attribute_length=max_attr_length
+    )
 
     # Debug: Log the attribute limits being applied
-    attr_value_length_limit = os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "default")
-    attr_count_limit = os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "default")
     logging.debug(
         f"[TracerProvider] Initializing with limits - "
-        f"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT={attr_value_length_limit}, "
-        f"OTEL_ATTRIBUTE_COUNT_LIMIT={attr_count_limit}"
+        f"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT={max_attr_length}, "
+        f"OTEL_ATTRIBUTE_COUNT_LIMIT={max_num_attrs}"
     )
 
     tracer = TracerProvider(resource=resource, span_limits=span_limits)
