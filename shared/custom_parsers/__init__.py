@@ -75,6 +75,30 @@ def do_parse(string):
     return string != "" and string is not None and string != "None"
 
 
+def log_attributes_debug(attributes, operation_name="attribute_processing"):
+    """
+    Log debug information about attributes.
+    Logs: total count, each key with value length, and overall size.
+    """
+    if not attributes:
+        logger.debug(f"[{operation_name}] No attributes to log")
+        return
+
+    total_count = len(attributes)
+    details = []
+
+    for key, value in attributes.items():
+        value_str = str(value) if value is not None else "None"
+        value_length = len(value_str)
+        details.append(f"{key}(len={value_length})")
+
+    logger.debug(
+        f"[{operation_name}] Total attributes: {total_count} | "
+        f"Details: {', '.join(details[:10])}"
+        f"{'...' if total_count > 10 else ''}"
+    )
+
+
 def check_env_vars():
     logger = get_logger("gitlab-exporter", "custom-parsers")
     keys = ("GLAB_TOKEN", "NEW_RELIC_API_KEY")
@@ -171,6 +195,9 @@ def grab_span_att_vars():
             if value is not None and value != "" and value != "None"
         }
 
+        # Log attributes debug information
+        log_attributes_debug(filtered_atts, "grab_span_att_vars")
+
     except Exception as e:
         logger = get_logger("gitlab-exporter", "custom-parsers")
         context = LogContext(
@@ -239,6 +266,9 @@ def parse_attributes(obj, prefix=""):
                 obj_atts.update(json_attrs)
             elif do_parse(value):
                 obj_atts[full_attribute_name] = str(value)
+
+    # Log attributes debug information
+    log_attributes_debug(obj_atts, "parse_attributes")
 
     return obj_atts
 
@@ -387,5 +417,8 @@ def parse_metrics_attributes(attributes):
         duration = float(attributes["duration"])
     else:
         duration = 0
+
+    # Log attributes debug information
+    log_attributes_debug(metrics_attributes, "parse_metrics_attributes")
 
     return duration, queued_duration, metrics_attributes

@@ -20,6 +20,7 @@ global GLAB_EXPORT_PATHS
 global GLAB_ENDPOINT
 global gl
 global OTEL_EXPORTER_OTEL_ENDPOINT
+global OTEL_EXPORTER_TYPE
 global endpoint
 global headers
 global paths
@@ -147,6 +148,14 @@ else:
         OTEL_EXPORTER_OTEL_ENDPOINT = "https://otlp.eu01.nr-data.net:4318"
     else:
         OTEL_EXPORTER_OTEL_ENDPOINT = "https://otlp.nr-data.net:4318"
+
+# Check which exporter type to use (otlp, console, or both)
+if "OTEL_EXPORTER_TYPE" in os.environ:
+    OTEL_EXPORTER_TYPE = os.getenv("OTEL_EXPORTER_TYPE").lower()
+    if OTEL_EXPORTER_TYPE not in ["otlp", "console", "both"]:
+        OTEL_EXPORTER_TYPE = "otlp"  # default to otlp if invalid value
+else:
+    OTEL_EXPORTER_TYPE = "otlp"  # default to otlp
 
 # Check runners scope
 if "GLAB_RUNNERS_SCOPE" in os.environ:

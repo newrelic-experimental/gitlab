@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 from opentelemetry.sdk.resources import Resource
 from shared.config.settings import GitLabConfig
+from shared.custom_parsers import log_attributes_debug
 
 
 class BaseProcessor(ABC):
@@ -46,6 +47,10 @@ class BaseProcessor(ABC):
             "service.name": self.service_name,
         }
         attributes.update(base_attributes)
+
+        # Log attributes debug information
+        log_attributes_debug(attributes, "BaseProcessor.create_resource_attributes")
+
         return attributes
 
     def should_exclude_item(

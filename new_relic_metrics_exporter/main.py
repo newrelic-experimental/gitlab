@@ -8,6 +8,8 @@ with proper error handling, performance monitoring, and structured logging.
 import asyncio
 import datetime
 import time
+import logging
+import sys
 from typing import List, Dict, Any, Optional
 import schedule
 from shared.logging import get_logger, LogContext
@@ -27,7 +29,8 @@ from shared.global_variables import (
     GLAB_STANDALONE,
     GLAB_EXPORT_LAST_MINUTES,
 )
-from get_resources import EnhancedResourceCollector
+from get_resources import EnhancedResourceCollector, global_logger
+from shared.otel import flush_otel_logs
 
 
 class GitLabMetricsExporter:
@@ -40,6 +43,7 @@ class GitLabMetricsExporter:
 
     def __init__(self):
         """Initialize the metrics exporter."""
+        # Use StructuredLogger - OTEL will capture these logs via LoggingHandler
         self.logger = get_logger("gitlab-metrics-exporter", "main")
         self.start_time = time.time()
         self.resource_collector = EnhancedResourceCollector()
@@ -287,6 +291,23 @@ class GitLabMetricsExporter:
                         f"Runners collection failed: {e}"
                     )
 
+                # Process all queued data before completion
+                # This is critical - ensures all data collected from projects is exported
+                try:
+                    self.logger.info(
+                        "Processing queued data from all projects", context
+                    )
+                    queue_stats = self.resource_collector.process_queue()
+                    self.logger.info(
+                        "Queue processing completed",
+                        context,
+                        extra={"queue_stats": queue_stats},
+                    )
+                    collection_results["queue_stats"] = queue_stats
+                except Exception as e:
+                    self.logger.error("Failed to process queue", context, exception=e)
+                    collection_results["errors"].append(f"Queue processing failed: {e}")
+
                 collection_results["duration_seconds"] = time.time() - self.start_time
                 timer["success"] = True
 
@@ -450,6 +471,42 @@ def main():
             "Fatal error in metrics exporter", context, exception=e
         )
         raise
+    finally:
+        # Final queue drain before exit to ensure no data is lost
+        try:
+            context = LogContext(
+                service_name="gitlab-metrics-exporter",
+                component="main",
+                operation="final_cleanup",
+            )
+            exporter.logger.info("Performing final queue drain before exit", context)
+            final_queue_stats = exporter.resource_collector.process_queue()
+            if final_queue_stats["total_items"] > 0:
+                exporter.logger.warning(
+                    f"Final queue drain found {final_queue_stats['total_items']} unprocessed items",
+                    context,
+                    extra={"queue_stats": final_queue_stats},
+                )
+        except Exception as e:
+            print(f"Error during final queue drain: {e}", file=sys.stderr)
+
+        # Shutdown OTEL providers to ensure all data is exported
+        import time
+        from shared.otel import shutdown_otel_providers
+
+        shutdown_start = time.time()
+        print(
+            f"[MAIN] Initiating OTEL shutdown at {time.strftime('%H:%M:%S')}...",
+            file=sys.stderr,
+            flush=True,
+        )
+        shutdown_success = shutdown_otel_providers(global_logger)
+        shutdown_duration = time.time() - shutdown_start
+        print(
+            f"[MAIN] OTEL shutdown {'successful' if shutdown_success else 'completed with warnings'} in {shutdown_duration:.2f}s",
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

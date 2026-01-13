@@ -44,13 +44,62 @@ def main():
     )
 
     try:
+        import time
+        import sys
+
+        start_time = time.time()
+
         logger.info("Starting GitLab New Relic Exporter", context)
+        print(
+            f"[MAIN] Process started at {time.strftime('%H:%M:%S')}",
+            file=sys.stderr,
+            flush=True,
+        )
 
         # Create and run the exporter
+        export_start = time.time()
         exporter = GitLabExporter()
         exporter.export_pipeline_data()
+        export_duration = time.time() - export_start
 
         logger.info("GitLab New Relic Exporter completed successfully", context)
+        print(
+            f"[MAIN] Export completed in {export_duration:.2f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(
+            f"[MAIN] Total runtime before shutdown: {time.time() - start_time:.2f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+
+        # Shutdown OTEL providers to ensure all data is exported
+        from shared.otel import shutdown_otel_providers
+
+        logger.info(
+            "Shutting down OTEL providers - waiting for all queued data to be exported",
+            LogContext(
+                service_name="gitlab-exporter", component="main", operation="shutdown"
+            ),
+        )
+        print(
+            f"[MAIN] Initiating OTEL shutdown at {time.strftime('%H:%M:%S')}",
+            file=sys.stderr,
+            flush=True,
+        )
+        shutdown_success = shutdown_otel_providers(logger)
+        shutdown_total = time.time() - start_time
+        print(
+            f"[MAIN] OTEL shutdown {'successful' if shutdown_success else 'completed with warnings'}",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(
+            f"[MAIN] Total process runtime: {shutdown_total:.2f}s",
+            file=sys.stderr,
+            flush=True,
+        )
 
     except Exception as e:
         logger.critical("Fatal error in GitLab exporter", context, exception=e)

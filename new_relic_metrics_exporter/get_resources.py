@@ -14,6 +14,7 @@ from shared.logging.structured_logger import (
 )
 import re
 from shared.global_variables import *
+from shared.global_variables import OTEL_EXPORTER_TYPE
 from shared.config.settings import get_config
 from shared.utils import generate_service_name
 import requests
@@ -31,7 +32,9 @@ global_resource_attributes = {
 global_resource = Resource(attributes=global_resource_attributes)
 
 # Global logger
-global_logger = get_logger(endpoint, headers, global_resource, "global_logger")
+global_logger = get_logger(
+    endpoint, headers, global_resource, "global_logger", OTEL_EXPORTER_TYPE
+)
 
 # Structured logger for this module
 structured_logger = get_structured_logger("gitlab-metrics-exporter", "get-resources")
@@ -136,33 +139,14 @@ async def grab_data(project):
                         "Project matched configuration, collecting data", context
                     )
                     project_id = json.loads(project.to_json())["id"]
+                    # Run all async data collection tasks concurrently
                     await asyncio.gather(
-                        get_pipelines(project, project_id, GLAB_SERVICE_NAME)
+                        get_pipelines(project, project_id, GLAB_SERVICE_NAME),
+                        get_deployments(project, project_id, GLAB_SERVICE_NAME),
+                        get_environments(project, project_id, GLAB_SERVICE_NAME),
+                        get_releases(project, project_id, GLAB_SERVICE_NAME),
                     )
-                    await asyncio.gather(
-                        get_deployments(project, project_id, GLAB_SERVICE_NAME)
-                    )
-                    await asyncio.gather(
-                        get_environments(project, project_id, GLAB_SERVICE_NAME)
-                    )
-                    await asyncio.gather(
-                        get_releases(project, project_id, GLAB_SERVICE_NAME)
-                    )
-                    if q.qsize() != 0:
-                        while q.qsize() > 0:
-                            data = q.get()
-                            if data[3] == "deployment":
-                                parse_deployment(data)
-                            elif data[3] == "environment":
-                                parse_environment(data)
-                            elif data[3] == "release":
-                                parse_release(data)
-                            elif data[3] == "pipeline":
-                                parse_pipeline(data)
-                            elif data[3] == "job":
-                                parse_job(data)
-                            # To bypass issues with overloading global logger with too much data
-                            time.sleep(0.05)
+                    # Queue processing moved to centralized location after all projects are processed
                 except Exception as e:
                     context = LogContext(
                         service_name="gitlab-metrics-exporter",
@@ -872,3 +856,79 @@ class EnhancedResourceCollector:
         except Exception as e:
             self.logger.error("Runners data collection failed", context, exception=e)
             raise
+
+    def process_queue(self) -> Dict[str, Any]:
+        """
+        Process all items in the global queue.
+        This ensures all collected data is exported before service termination.
+
+        Returns:
+            Dictionary with processing statistics
+        """
+        from shared.global_variables import q
+
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="enhanced-collector",
+            operation="process_queue",
+        )
+
+        stats = {
+            "total_items": 0,
+            "deployments": 0,
+            "environments": 0,
+            "releases": 0,
+            "pipelines": 0,
+            "jobs": 0,
+            "errors": 0,
+        }
+
+        initial_size = q.qsize()
+        self.logger.info(
+            f"Starting queue processing with {initial_size} items",
+            context,
+            extra={"queue_size": initial_size},
+        )
+
+        while q.qsize() > 0:
+            try:
+                data = q.get(timeout=1)
+                stats["total_items"] += 1
+
+                data_type = data[3]
+
+                if data_type == "deployment":
+                    parse_deployment(data)
+                    stats["deployments"] += 1
+                elif data_type == "environment":
+                    parse_environment(data)
+                    stats["environments"] += 1
+                elif data_type == "release":
+                    parse_release(data)
+                    stats["releases"] += 1
+                elif data_type == "pipeline":
+                    parse_pipeline(data)
+                    stats["pipelines"] += 1
+                elif data_type == "job":
+                    parse_job(data)
+                    stats["jobs"] += 1
+
+                # Small delay to avoid overloading the logger
+                time.sleep(0.05)
+
+            except Exception as e:
+                stats["errors"] += 1
+                self.logger.error(
+                    "Error processing queue item",
+                    context,
+                    exception=e,
+                    extra={"item_number": stats["total_items"]},
+                )
+
+        self.logger.info(
+            f"Queue processing completed - processed {stats['total_items']} items",
+            context,
+            extra=stats,
+        )
+
+        return stats
