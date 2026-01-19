@@ -119,11 +119,67 @@ async def grab_data(project):
         config = get_config()
         GLAB_SERVICE_NAME = generate_service_name(project, config)
         project_json = json.loads(project.to_json())
-        # Check if we should export only data for specific groups/projects
-        if GLAB_EXPORT_PATHS_ALL or (
+
+        # ALWAYS export project metadata for every project collected
+        # This ensures all projects show up in New Relic, regardless of filters
+        c_attributes = create_resource_attributes(
+            parse_attributes(project_json), GLAB_SERVICE_NAME
+        )
+        c_attributes.update({"gitlab.resource.type": "project"})
+        msg = "Project: " + str(project_json["id"]) + " - " + str(GLAB_SERVICE_NAME)
+        global_logger._log(level=logging.INFO, msg=msg, extra=c_attributes, args="")
+        context = LogContext(
+            service_name="gitlab-metrics-exporter",
+            component="get-resources",
+            operation="grab_data",
+            project_id=str(project_json["id"]),
+            project_name=str(GLAB_SERVICE_NAME),
+        )
+        structured_logger.info("Log events sent for project", context)
+
+        # Debug: Check path filter
+        path_check = GLAB_EXPORT_PATHS_ALL or (
             paths and str(project_json["namespace"]["full_path"]) in paths
-        ):
-            if re.search(str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]):
+        )
+
+        # Check if we should export only data for specific groups/projects
+        # NOTE: Filters below only affect DETAILED data collection (pipelines, deployments, etc.)
+        # Project metadata is ALWAYS exported (see above)
+        if path_check:
+            # Debug: Check regex filter
+            regex_check = re.search(
+                str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]
+            )
+
+            # Log filter configuration information on first project (for diagnostics)
+            if project_json["id"] == 1:  # Log only once per run
+                context = LogContext(
+                    service_name="gitlab-metrics-exporter",
+                    component="get-resources",
+                    operation="grab_data",
+                )
+                if GLAB_EXPORT_ALL_PROJECTS:
+                    structured_logger.info(
+                        "Data collection mode: GLAB_EXPORT_ALL_PROJECTS=true - exporting ALL historical data",
+                        context,
+                        extra={
+                            "glab_export_all_projects": GLAB_EXPORT_ALL_PROJECTS,
+                            "glab_export_last_minutes": GLAB_EXPORT_LAST_MINUTES,
+                            "mode": "all_data"
+                        }
+                    )
+                else:
+                    structured_logger.info(
+                        "Data collection mode: GLAB_EXPORT_ALL_PROJECTS=false - exporting recent data only",
+                        context,
+                        extra={
+                            "glab_export_all_projects": GLAB_EXPORT_ALL_PROJECTS,
+                            "glab_export_last_minutes": GLAB_EXPORT_LAST_MINUTES,
+                            "mode": "recent_data_only"
+                        }
+                    )
+
+            if regex_check:
                 try:
                     context = LogContext(
                         service_name="gitlab-metrics-exporter",
@@ -181,39 +237,8 @@ async def grab_data(project):
                         structured_logger.error(
                             "Unable to obtain DORA metrics", context, exception=e
                         )
-                # Export project metadata based on configuration
-                # When GLAB_EXPORT_ALL_PROJECTS=True (default): Always export all projects as a snapshot
-                # When GLAB_EXPORT_ALL_PROJECTS=False (legacy): Only export projects with recent activity
-                should_export_project = GLAB_EXPORT_ALL_PROJECTS or (
-                    zulu.parse(project_json["last_activity_at"])
-                    >= (
-                        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
-                        - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
-                    )
-                )
-
-                if should_export_project:
-                    c_attributes = create_resource_attributes(
-                        parse_attributes(project_json), GLAB_SERVICE_NAME
-                    )
-                    c_attributes.update({"gitlab.resource.type": "project"})
-                    msg = (
-                        "Project: "
-                        + str(project_json["id"])
-                        + " - "
-                        + str(GLAB_SERVICE_NAME)
-                    )
-                    global_logger._log(
-                        level=logging.INFO, msg=msg, extra=c_attributes, args=""
-                    )
-                    context = LogContext(
-                        service_name="gitlab-metrics-exporter",
-                        component="get-resources",
-                        operation="grab_data",
-                        project_id=str(project_json["id"]),
-                        project_name=str(GLAB_SERVICE_NAME),
-                    )
-                    structured_logger.info("Log events sent for project", context)
+                # Project metadata already exported at the top of grab_data()
+                # Filters above only control detailed data collection
             else:
                 context = LogContext(
                     service_name="gitlab-metrics-exporter",
@@ -223,14 +248,32 @@ async def grab_data(project):
                     .lower()
                     .replace(" ", ""),
                 )
-                structured_logger.info(
-                    "No project name matched configured regex",
+                structured_logger.debug(
+                    f"Project filtered out by regex: {project_json['name']} doesn't match {GLAB_EXPORT_PROJECTS_REGEX}",
                     context,
                     extra={
                         "regex": str(GLAB_EXPORT_PROJECTS_REGEX),
-                        "paths": str(paths),
+                        "project_name": project_json["name"],
                     },
                 )
+        else:
+            context = LogContext(
+                service_name="gitlab-metrics-exporter",
+                component="get-resources",
+                operation="grab_data",
+                project_name=str((project.attributes.get("name_with_namespace")))
+                .lower()
+                .replace(" ", ""),
+            )
+            structured_logger.debug(
+                f"Project filtered out by path: {project_json['namespace']['full_path']} not in allowed paths",
+                context,
+                extra={
+                    "namespace_path": str(project_json["namespace"]["full_path"]),
+                    "allowed_paths": str(paths),
+                    "export_all_paths": GLAB_EXPORT_PATHS_ALL,
+                },
+            )
     except Exception as e:
         context = LogContext(
             service_name="gitlab-metrics-exporter",
@@ -371,14 +414,21 @@ async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
     if len(deployments) > 0:  # check if there are deployments in this project
         for deployment in deployments:
             deployment_json = json.loads(deployment.to_json())
-            if zulu.parse(deployment_json["created_at"]) >= (
-                datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
-                - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
-            ):
+            # Only apply time filter if GLAB_EXPORT_ALL_PROJECTS is False
+            if GLAB_EXPORT_ALL_PROJECTS:
+                # Export all deployments regardless of age
                 q.put([deployment_json, project_id, GLAB_SERVICE_NAME, "deployment"])
                 deployments_matching += 1
             else:
-                break
+                # Legacy: Only export deployments within time window
+                if zulu.parse(deployment_json["created_at"]) >= (
+                    datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                    - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+                ):
+                    q.put([deployment_json, project_id, GLAB_SERVICE_NAME, "deployment"])
+                    deployments_matching += 1
+                else:
+                    break
         context = LogContext(
             service_name="gitlab-metrics-exporter",
             component="get-resources",
@@ -526,14 +576,21 @@ async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
     if len(releases) > 0:  # check if there are releases in this project
         for release in releases:
             release_json = json.loads(release.to_json())
-            if zulu.parse(release_json["created_at"]) >= (
-                datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
-                - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
-            ):
+            # Only apply time filter if GLAB_EXPORT_ALL_PROJECTS is False
+            if GLAB_EXPORT_ALL_PROJECTS:
+                # Export all releases regardless of age
                 q.put([release_json, project_id, GLAB_SERVICE_NAME, "release"])
                 releases_matching += 1
             else:
-                break
+                # Legacy: Only export releases within time window
+                if zulu.parse(release_json["created_at"]) >= (
+                    datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                    - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+                ):
+                    q.put([release_json, project_id, GLAB_SERVICE_NAME, "release"])
+                    releases_matching += 1
+                else:
+                    break
 
         context = LogContext(
             service_name="gitlab-metrics-exporter",
@@ -641,16 +698,23 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
         project_id=str(project_id),
     )
     structured_logger.info("Gathering pipeline data for project", context)
-    pipelines = current_project.pipelines.list(
-        iterator=True,
-        per_page=100,
-        updated_after=str(
+
+    # Build pipeline query - conditionally include time filter
+    pipeline_kwargs = {
+        "iterator": True,
+        "per_page": 100,
+    }
+
+    # Only apply time filter if GLAB_EXPORT_ALL_PROJECTS is False
+    if not GLAB_EXPORT_ALL_PROJECTS:
+        pipeline_kwargs["updated_after"] = str(
             (
                 datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
                 - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
             )
-        ),
-    )
+        )
+
+    pipelines = current_project.pipelines.list(**pipeline_kwargs)
     context = LogContext(
         service_name="gitlab-metrics-exporter",
         component="get-resources",
@@ -772,9 +836,19 @@ def get_jobs(pipelineobject, current_project, project_id, GLAB_SERVICE_NAME):
                 continue
             if job_name in exclude_jobs or job_stage in exclude_jobs:
                 continue
-            if zulu.parse(job_json["created_at"]) >= datetime.now(timezone.utc).replace(
-                tzinfo=pytz.utc
-            ) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)):
+            # Only apply time filter if GLAB_EXPORT_ALL_PROJECTS is False
+            should_queue_job = False
+            if GLAB_EXPORT_ALL_PROJECTS:
+                # Export all jobs regardless of age
+                should_queue_job = True
+            else:
+                # Legacy: Only export jobs within time window
+                if zulu.parse(job_json["created_at"]) >= datetime.now(timezone.utc).replace(
+                    tzinfo=pytz.utc
+                ) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)):
+                    should_queue_job = True
+
+            if should_queue_job:
                 q.put(
                     [
                         job_json,
