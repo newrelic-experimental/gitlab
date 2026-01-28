@@ -30,7 +30,7 @@ from shared.global_variables import (
     GLAB_EXPORT_LAST_MINUTES,
 )
 from get_resources import EnhancedResourceCollector, global_logger
-from shared.otel import flush_otel_logs
+from shared.otel import flush_otel_logs, get_otel_queue_stats
 
 
 class GitLabMetricsExporter:
@@ -261,13 +261,72 @@ class GitLabMetricsExporter:
                     },
                 )
 
-                # Create tasks for concurrent processing
-                tasks = [self.process_project(project) for project in projects]
+                # Process projects in batches to allow periodic flushing
+                # This prevents OTEL queue overflow when processing 1000+ projects
+                batch_size = 100
+                total_batches = (len(projects) + batch_size - 1) // batch_size
 
-                # Process with controlled concurrency
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                self.logger.info(
+                    f"Processing {len(projects)} projects in {total_batches} batches of {batch_size}",
+                    context,
+                    extra={"batch_size": batch_size, "total_batches": total_batches},
+                )
 
-                # Analyze results
+                all_results = []
+                for batch_num in range(total_batches):
+                    start_idx = batch_num * batch_size
+                    end_idx = min(start_idx + batch_size, len(projects))
+                    batch_projects = projects[start_idx:end_idx]
+
+                    self.logger.info(
+                        f"Processing batch {batch_num + 1}/{total_batches} ({len(batch_projects)} projects)",
+                        context,
+                        extra={
+                            "batch_number": batch_num + 1,
+                            "batch_size": len(batch_projects),
+                            "start_index": start_idx,
+                            "end_index": end_idx,
+                        },
+                    )
+
+                    # Create tasks for this batch
+                    batch_tasks = [
+                        self.process_project(project) for project in batch_projects
+                    ]
+
+                    # Process batch with controlled concurrency
+                    batch_results = await asyncio.gather(
+                        *batch_tasks, return_exceptions=True
+                    )
+                    all_results.extend(batch_results)
+
+                    # Force flush after each batch to prevent queue overflow
+                    self.logger.info(
+                        f"Flushing logs after batch {batch_num + 1}/{total_batches}",
+                        context,
+                    )
+                    flush_otel_logs(global_logger)
+                    self.logger.info(
+                        f"Batch {batch_num + 1} flushed successfully", context
+                    )
+
+                    # Monitor OTEL queue for potential overflow
+                    queue_stats = get_otel_queue_stats(global_logger)
+                    if queue_stats and not queue_stats.get("error"):
+                        self.logger.info(
+                            f"OTEL queue status after batch {batch_num + 1}/{total_batches}",
+                            context,
+                            extra=queue_stats
+                        )
+                        if queue_stats.get("is_at_risk"):
+                            self.logger.warning(
+                                f"⚠️  OTEL queue at {queue_stats.get('queue_utilization_pct', 0)}% capacity - risk of data loss",
+                                context,
+                                extra=queue_stats
+                            )
+
+                # Analyze results from all batches
+                results = all_results
                 for result in results:
                     if isinstance(result, Exception):
                         collection_results["failed_projects"] += 1
@@ -279,10 +338,25 @@ class GitLabMetricsExporter:
                         if result.get("error"):
                             collection_results["errors"].append(result["error"])
 
+                self.logger.info(
+                    f"All {len(projects)} projects processed across {total_batches} batches",
+                    context,
+                    extra={"total_projects": len(projects), "batches": total_batches},
+                )
+
                 # Collect runners data
                 try:
                     await self.resource_collector.collect_runners_data()
                     self.logger.info("Runners data collection completed", context)
+
+                    # CRITICAL: Force flush runner logs to OTEL exporter immediately
+                    # Runners log directly via global_logger (not through queue)
+                    # Must export before container exits
+                    self.logger.info(
+                        "Force flushing runner logs to ensure export", context
+                    )
+                    flush_otel_logs(global_logger)
+                    self.logger.info("Runner logs flushed successfully", context)
                 except Exception as e:
                     self.logger.error(
                         "Failed to collect runners data", context, exception=e
@@ -304,6 +378,16 @@ class GitLabMetricsExporter:
                         extra={"queue_stats": queue_stats},
                     )
                     collection_results["queue_stats"] = queue_stats
+
+                    # Force flush project data logs immediately after processing queue
+                    if queue_stats["total_items"] > 0:
+                        self.logger.info(
+                            "Force flushing project data logs to ensure export", context
+                        )
+                        flush_otel_logs(global_logger)
+                        self.logger.info(
+                            "Project data logs flushed successfully", context
+                        )
                 except Exception as e:
                     self.logger.error("Failed to process queue", context, exception=e)
                     collection_results["errors"].append(f"Queue processing failed: {e}")
@@ -472,24 +556,6 @@ def main():
         )
         raise
     finally:
-        # Final queue drain before exit to ensure no data is lost
-        try:
-            context = LogContext(
-                service_name="gitlab-metrics-exporter",
-                component="main",
-                operation="final_cleanup",
-            )
-            exporter.logger.info("Performing final queue drain before exit", context)
-            final_queue_stats = exporter.resource_collector.process_queue()
-            if final_queue_stats["total_items"] > 0:
-                exporter.logger.warning(
-                    f"Final queue drain found {final_queue_stats['total_items']} unprocessed items",
-                    context,
-                    extra={"queue_stats": final_queue_stats},
-                )
-        except Exception as e:
-            print(f"Error during final queue drain: {e}", file=sys.stderr)
-
         # Shutdown OTEL providers to ensure all data is exported
         import time
         from shared.otel import shutdown_otel_providers
