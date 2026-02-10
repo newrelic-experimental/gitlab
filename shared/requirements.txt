@@ -1,32 +1,30 @@
 # Core OpenTelemetry dependencies
-opentelemetry-api==1.21.0
-opentelemetry-sdk==1.21.0
-opentelemetry-exporter-otlp-proto-grpc==1.21.0
-opentelemetry-instrumentation-logging==0.42b0
+opentelemetry-api==1.39.1
+opentelemetry-sdk==1.39.1
+opentelemetry-exporter-otlp-proto-grpc==1.39.1
+opentelemetry-instrumentation-logging==0.60b1
 
 # Fix pkg_resources deprecation warning
 setuptools<81
 
-# GitLab API client
-python-gitlab==4.2.0
+# GitLab API client - upgraded for compatibility
+python-gitlab==4.7.0
 
 # Date/time handling
-pyrfc3339==1.1
+pyrfc3339==2.1.0
 zulu==2.0.1
 
 # Task scheduling
-schedule==1.2.0
+schedule==1.2.2
 
-# Text processing
-regex==2023.10.3
+# Text processing - upgraded for stability
+regex==2026.1.15
 
 # Data processing
-pandas>=2.2.0
+pandas>=3.0.0
 
-# HTTP requests
-requests==2.32.4
+# HTTP requests - upgraded for security
+requests==2.32.5
 
-# Structured logging
-structlog==23.2.0
-
-# Note: asyncio is part of Python standard library (Python 3.4+), no need to install
+# Structured logging - upgraded for compatibility
+structlog==25.5.0

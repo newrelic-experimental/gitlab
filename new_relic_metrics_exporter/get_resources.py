@@ -2,7 +2,6 @@ import json
 import os
 from datetime import datetime, timedelta, date, timezone
 from typing import Dict, Any
-import pytz
 import zulu
 from opentelemetry.sdk.resources import Resource
 from shared.otel import get_logger, create_resource_attributes, get_meter
@@ -203,7 +202,7 @@ async def grab_data(project):
                 should_export_project = GLAB_EXPORT_ALL_PROJECTS or (
                     zulu.parse(project_json["last_activity_at"])
                     >= (
-                        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                        datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                         - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
                     )
                 )
@@ -388,7 +387,7 @@ async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
         for deployment in deployments:
             deployment_json = json.loads(deployment.to_json())
             if zulu.parse(deployment_json["created_at"]) >= (
-                datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
             ):
                 q.put([deployment_json, project_id, GLAB_SERVICE_NAME, "deployment"])
@@ -543,7 +542,7 @@ async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
         for release in releases:
             release_json = json.loads(release.to_json())
             if zulu.parse(release_json["created_at"]) >= (
-                datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
             ):
                 q.put([release_json, project_id, GLAB_SERVICE_NAME, "release"])
@@ -662,7 +661,7 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
         per_page=100,
         updated_after=str(
             (
-                datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
             )
         ),
@@ -789,7 +788,7 @@ def get_jobs(pipelineobject, current_project, project_id, GLAB_SERVICE_NAME):
             if job_name in exclude_jobs or job_stage in exclude_jobs:
                 continue
             if zulu.parse(job_json["created_at"]) >= datetime.now(timezone.utc).replace(
-                tzinfo=pytz.utc
+                tzinfo=timezone.utc
             ) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES)):
                 q.put(
                     [
