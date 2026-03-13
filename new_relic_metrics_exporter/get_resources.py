@@ -80,9 +80,6 @@ _run_stats = {
     "runners_offline": 0,
     "runners_active": 0,
     "runners_paused": 0,
-    "window_pipelines": 0,
-    "window_deployments": 0,
-    "total_releases": 0,
 }
 
 
@@ -100,9 +97,6 @@ def reset_collection_flags():
             "runners_offline": 0,
             "runners_active": 0,
             "runners_paused": 0,
-            "window_pipelines": 0,
-            "window_deployments": 0,
-            "total_releases": 0,
         }
 
 
@@ -519,12 +513,6 @@ async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
     matching, total_count, total_api = await loop.run_in_executor(
         _executor, _sync_fetch_deployments, current_project, cutoff
     )
-    if os.getenv("GLAB_SUMMARY_ESTATE_COUNTS", "").lower() == "true":
-        try:
-            with _run_stats_lock:
-                _run_stats["window_deployments"] += total_api
-        except Exception:
-            pass
     for deployment_json in matching:
         q.put([deployment_json, project_id, GLAB_SERVICE_NAME, "deployment"])
     if total_count > 0:
@@ -773,13 +761,6 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
         _executor, _sync_fetch_pipelines, current_project, pipeline_kwargs
     )
 
-    if os.getenv("GLAB_SUMMARY_ESTATE_COUNTS", "").lower() == "true":
-        try:
-            with _run_stats_lock:
-                _run_stats["window_pipelines"] += total
-        except Exception:
-            pass
-
     job_futures = []
     for pipelineobject in pipeline_objects:
         # Serialize once and share to avoid duplicate to_json() calls
@@ -937,11 +918,6 @@ def emit_collection_summary(collection_results: dict, projects: list) -> None:
 
     for status, count in run_stats.get("job_statuses", {}).items():
         summary_attributes[f"window.job_status.{status}"] = count
-
-    if os.getenv("GLAB_SUMMARY_ESTATE_COUNTS", "").lower() == "true":
-        summary_attributes["window.total_pipelines"] = run_stats.get("window_pipelines", 0)
-        summary_attributes["window.total_deployments"] = run_stats.get("window_deployments", 0)
-        summary_attributes["estate.total_releases"] = run_stats.get("total_releases", 0)
 
     global_logger.info(
         "GitLab collection summary",

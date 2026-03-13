@@ -35,7 +35,7 @@ class TestGlobalVariables:
             assert gv.GLAB_EXPORT_LOGS is True
             assert gv.GLAB_STANDALONE is False
             assert gv.GLAB_EXPORT_LAST_MINUTES == 61
-            assert gv.GLAB_EXPORT_ALL_PROJECTS is False
+            assert gv.GLAB_EXPORT_ALL_PROJECTS is True
             assert gv.GLAB_PROJECT_OWNERSHIP is True
             assert gv.GLAB_PROJECT_VISIBILITIES == ["private"]
             assert gv.GLAB_SERVICE_NAME == "gitlab-exporter"
@@ -55,7 +55,7 @@ class TestGlobalVariables:
             "GLAB_EXPORT_LOGS": "false",
             "GLAB_STANDALONE": "true",
             "GLAB_EXPORT_LAST_MINUTES": "120",
-            "GLAB_EXPORT_ALL_PROJECTS": "true",
+            "GLAB_EXPORT_ALL_PROJECTS": "false",
             "GLAB_PROJECT_OWNERSHIP": "false",
             "GLAB_PROJECT_VISIBILITIES": "public,internal",
             "GLAB_EXPORT_PROJECTS_REGEX": "test-.*",
@@ -84,7 +84,7 @@ class TestGlobalVariables:
             assert gv.GLAB_EXPORT_LOGS is False
             assert gv.GLAB_STANDALONE is True
             assert gv.GLAB_EXPORT_LAST_MINUTES == 121  # +1 added
-            assert gv.GLAB_EXPORT_ALL_PROJECTS is True
+            assert gv.GLAB_EXPORT_ALL_PROJECTS is False
             assert gv.GLAB_PROJECT_OWNERSHIP is False
             assert gv.GLAB_PROJECT_VISIBILITIES == ["public", "internal"]
             assert gv.GLAB_EXPORT_PROJECTS_REGEX == "test-.*"
