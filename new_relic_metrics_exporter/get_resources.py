@@ -289,14 +289,17 @@ async def grab_data(project):
                     # Deployments and environments only change state via pipeline jobs.
                     # Releases are independent (can be created via UI/API without a pipeline).
                     pipeline_count = await get_pipelines(project, project_id, GLAB_SERVICE_NAME)
+                    # Environments are always emitted as a full snapshot (state, not events).
+                    # Releases are independent (can be created via UI/API without a pipeline).
+                    # Deployments only happen via pipeline jobs — skip if no pipelines ran.
                     secondary_tasks = [
+                        get_environments(project, project_id, GLAB_SERVICE_NAME),
                         get_releases(project, project_id, GLAB_SERVICE_NAME),
                     ]
                     if pipeline_count > 0:
-                        secondary_tasks.extend([
-                            get_deployments(project, project_id, GLAB_SERVICE_NAME),
-                            get_environments(project, project_id, GLAB_SERVICE_NAME),
-                        ])
+                        secondary_tasks.append(
+                            get_deployments(project, project_id, GLAB_SERVICE_NAME)
+                        )
                     await asyncio.gather(*secondary_tasks)
                     # Queue processing moved to centralized location after all projects are processed
                 except Exception as e:
