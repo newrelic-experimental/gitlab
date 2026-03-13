@@ -259,15 +259,40 @@ def filter_otel_log_attributes(attrs: dict) -> dict:
         and k.lower() not in keys_to_drop
     }
 
-    limit = int(os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "128"))
-    if len(filtered) > limit:
+    # OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT takes precedence over OTEL_ATTRIBUTE_COUNT_LIMIT
+    # for log records specifically. Fall back to the global limit if not set.
+    count_limit = int(
+        os.getenv("OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT")
+        or os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT")
+        or 128
+    )
+    value_limit = int(
+        os.getenv("OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT")
+        or os.getenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT")
+        or 0  # 0 = no limit
+    )
+
+    _log = None  # lazy — only create if we need to warn
+
+    if len(filtered) > count_limit:
         all_keys = list(filtered.keys())
-        will_be_dropped = all_keys[limit:]
+        will_be_dropped = all_keys[count_limit:]
         _log = get_logger("gitlab-exporter", "custom-parsers")
         _log.warning(
-            f"OTEL will drop {len(will_be_dropped)} attributes (limit={limit}, have={len(filtered)}): "
-            f"{will_be_dropped}"
+            f"OTEL will drop {len(will_be_dropped)} attributes due to count limit "
+            f"(limit={count_limit}, have={len(filtered)}): {will_be_dropped}"
         )
+
+    if value_limit:
+        truncated = {k: v for k, v in filtered.items() if len(str(v)) > value_limit}
+        if truncated:
+            if _log is None:
+                _log = get_logger("gitlab-exporter", "custom-parsers")
+            _log.warning(
+                f"OTEL will truncate {len(truncated)} attribute values exceeding "
+                f"value length limit ({value_limit}): "
+                f"{[(k, len(str(v))) for k, v in truncated.items()]}"
+            )
 
     return filtered
 
