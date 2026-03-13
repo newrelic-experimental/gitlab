@@ -284,13 +284,20 @@ async def grab_data(project):
                         "Project matched configuration, collecting data", context
                     )
                     project_id = project_json["id"]
-                    # Run all async data collection tasks concurrently
-                    await asyncio.gather(
-                        get_pipelines(project, project_id, GLAB_SERVICE_NAME),
-                        get_deployments(project, project_id, GLAB_SERVICE_NAME),
-                        get_environments(project, project_id, GLAB_SERVICE_NAME),
+                    # Check pipelines first — skip pipeline-dependent resources if none found.
+                    # Jobs are implicitly skipped (fetched inside get_pipelines; 0 pipelines = 0 job calls).
+                    # Deployments and environments only change state via pipeline jobs.
+                    # Releases are independent (can be created via UI/API without a pipeline).
+                    pipeline_count = await get_pipelines(project, project_id, GLAB_SERVICE_NAME)
+                    secondary_tasks = [
                         get_releases(project, project_id, GLAB_SERVICE_NAME),
-                    )
+                    ]
+                    if pipeline_count > 0:
+                        secondary_tasks.extend([
+                            get_deployments(project, project_id, GLAB_SERVICE_NAME),
+                            get_environments(project, project_id, GLAB_SERVICE_NAME),
+                        ])
+                    await asyncio.gather(*secondary_tasks)
                     # Queue processing moved to centralized location after all projects are processed
                 except Exception as e:
                     context = LogContext(
@@ -746,6 +753,8 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
     # Await all job fetches — ensures queue is fully populated before get_pipelines returns
     if job_futures:
         await asyncio.gather(*job_futures, return_exceptions=True)
+
+    return len(job_futures)  # number of pipelines found in the window
 
 
 def parse_job(data):
