@@ -39,9 +39,15 @@ global_logger = get_otel_logger(
     endpoint, headers, global_resource, "global_logger", OTEL_EXPORTER_TYPE
 )
 
-# Shared executor for blocking job-list API calls across all concurrent projects.
-# run_in_executor() delegates the blocking python-gitlab HTTP calls to threads
-# while the asyncio event loop stays free. Max workers is tunable via env var.
+# General executor for all blocking python-gitlab list() API calls (pipelines,
+# deployments, environments, releases). Keeps the asyncio event loop free so
+# concurrent project coroutines actually run in parallel.
+_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=int(os.getenv("GLAB_API_WORKERS", "50")),
+    thread_name_prefix="glab-api",
+)
+
+# Dedicated executor for per-pipeline job fetches (can be tuned independently).
 _job_executor = concurrent.futures.ThreadPoolExecutor(
     max_workers=int(os.getenv("GLAB_JOB_WORKERS", "20")),
     thread_name_prefix="glab-jobs",
@@ -452,33 +458,73 @@ def parse_deployment(data):
         )
 
 
+# ---------------------------------------------------------------------------
+# Sync fetch helpers — run inside _executor so blocking HTTP calls don't
+# stall the asyncio event loop while other project coroutines are waiting.
+# ---------------------------------------------------------------------------
+
+def _sync_fetch_pipelines(project, kwargs):
+    """Fetch all pipeline objects in the window. Returns (objects, total)."""
+    it = project.pipelines.list(**kwargs)
+    objects = list(it)
+    return objects, getattr(it, "total", None) or len(objects)
+
+
+def _sync_fetch_deployments(project, cutoff):
+    """Fetch deployments updated after cutoff; stops on first miss. Returns (matching_jsons, total_fetched, total_api)."""
+    it = project.deployments.list(
+        iterator=True, per_page=100, order_by="updated_at", sort="desc",
+        updated_after=str(cutoff),
+    )
+    total_api = getattr(it, "total", None) or 0
+    matching, total_fetched = [], 0
+    for dep in it:
+        total_fetched += 1
+        dep_json = json.loads(dep.to_json())
+        if zulu.parse(dep_json["created_at"]) >= cutoff:
+            matching.append(dep_json)
+        else:
+            break
+    return matching, total_fetched, total_api
+
+
+def _sync_fetch_environments(project):
+    """Fetch all environment objects for a project."""
+    return project.environments.list(get_all=True, per_page=100)
+
+
+def _sync_fetch_releases(project, cutoff):
+    """Fetch releases created after cutoff; stops on first miss. Returns (matching_jsons, total_fetched)."""
+    it = project.releases.list(iterator=True, per_page=100, order_by="created_at", sort="desc")
+    matching, total_fetched = [], 0
+    for rel in it:
+        total_fetched += 1
+        rel_json = json.loads(rel.to_json())
+        if zulu.parse(rel_json["created_at"]) >= cutoff:
+            matching.append(rel_json)
+        else:
+            break
+    return matching, total_fetched
+
+
 async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
     global q
     cutoff = (
         datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
         - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
     )
-    # Server-side filter reduces pages fetched; client-side break stops iteration early
-    deployments = current_project.deployments.list(
-        iterator=True, order_by="updated_at", sort="desc", updated_after=str(cutoff)
+    loop = asyncio.get_running_loop()
+    matching, total_count, total_api = await loop.run_in_executor(
+        _executor, _sync_fetch_deployments, current_project, cutoff
     )
     if os.getenv("GLAB_SUMMARY_ESTATE_COUNTS", "").lower() == "true":
         try:
             with _run_stats_lock:
-                _run_stats["window_deployments"] += deployments.total or 0
+                _run_stats["window_deployments"] += total_api
         except Exception:
             pass
-    total_count = 0
-    deployments_matching = 0
-    for deployment in deployments:
-        total_count += 1
-        deployment_json = json.loads(deployment.to_json())
-        if zulu.parse(deployment_json["created_at"]) >= cutoff:
-            q.put([deployment_json, project_id, GLAB_SERVICE_NAME, "deployment"])
-            deployments_matching += 1
-        else:
-            break
-
+    for deployment_json in matching:
+        q.put([deployment_json, project_id, GLAB_SERVICE_NAME, "deployment"])
     if total_count > 0:
         context = LogContext(
             service_name="gitlab-metrics-exporter",
@@ -489,7 +535,7 @@ async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
         structured_logger.info(
             "Deployments processed",
             context,
-            extra={"deployment_count": total_count, "matching_count": deployments_matching},
+            extra={"deployment_count": total_count, "matching_count": len(matching)},
         )
 
 
@@ -535,7 +581,10 @@ def parse_environment(data):
 
 async def get_environments(current_project, project_id, GLAB_SERVICE_NAME):
     global q
-    environments = current_project.environments.list(get_all=True)
+    loop = asyncio.get_running_loop()
+    environments = await loop.run_in_executor(
+        _executor, _sync_fetch_environments, current_project
+    )
     if len(environments) > 0:  # check if there are environments in this project
         for environment in environments:
             environment_json = json.loads(environment.to_json())
@@ -608,31 +657,16 @@ def parse_release(data):
 
 async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
     global q
-    # iterator=True fetches pages lazily so the break below stops further page fetches
-    releases = current_project.releases.list(
-        iterator=True, order_by="created_at", sort="desc"
-    )
-    if os.getenv("GLAB_SUMMARY_ESTATE_COUNTS", "").lower() == "true":
-        try:
-            with _run_stats_lock:
-                _run_stats["total_releases"] += releases.total or 0
-        except Exception:
-            pass
     cutoff = (
         datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
         - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
     )
-    total_count = 0
-    releases_matching = 0
-    for release in releases:
-        total_count += 1
-        release_json = json.loads(release.to_json())
-        if zulu.parse(release_json["created_at"]) >= cutoff:
-            q.put([release_json, project_id, GLAB_SERVICE_NAME, "release"])
-            releases_matching += 1
-        else:
-            break  # sorted desc — all remaining releases are older, stop fetching pages
-
+    loop = asyncio.get_running_loop()
+    matching, total_count = await loop.run_in_executor(
+        _executor, _sync_fetch_releases, current_project, cutoff
+    )
+    for release_json in matching:
+        q.put([release_json, project_id, GLAB_SERVICE_NAME, "release"])
     if total_count > 0:
         context = LogContext(
             service_name="gitlab-metrics-exporter",
@@ -643,7 +677,7 @@ async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
         structured_logger.info(
             "Releases processed",
             context,
-            extra={"release_count": total_count, "matching_count": releases_matching},
+            extra={"release_count": total_count, "matching_count": len(matching)},
         )
 
 
@@ -722,31 +756,35 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
     pipeline_kwargs = {
         "iterator": True,
         "per_page": 100,
+        "updated_after": str(
+            datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+            - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+        ),
+        "order_by": "updated_at",
+        "sort": "desc",
     }
 
-    pipeline_kwargs["updated_after"] = str(
-        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
-        - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+    # Fetch all pipeline objects in the thread pool — blocking HTTP calls must
+    # not run on the event loop or they stall all other concurrent coroutines.
+    loop = asyncio.get_running_loop()
+    pipeline_objects, total = await loop.run_in_executor(
+        _executor, _sync_fetch_pipelines, current_project, pipeline_kwargs
     )
-    pipeline_kwargs["order_by"] = "updated_at"
-    pipeline_kwargs["sort"] = "desc"
 
-    pipelines = current_project.pipelines.list(**pipeline_kwargs)
     if os.getenv("GLAB_SUMMARY_ESTATE_COUNTS", "").lower() == "true":
         try:
             with _run_stats_lock:
-                _run_stats["window_pipelines"] += pipelines.total or 0
+                _run_stats["window_pipelines"] += total
         except Exception:
             pass
 
-    loop = asyncio.get_event_loop()
     job_futures = []
-    for pipelineobject in pipelines:
+    for pipelineobject in pipeline_objects:
         # Serialize once and share to avoid duplicate to_json() calls
         pipeline_dict = json.loads(pipelineobject.to_json())
         # Queue the pipeline record inline — it's just a q.put(), no I/O
         q.put([pipeline_dict, project_id, GLAB_SERVICE_NAME, "pipeline"])
-        # Delegate blocking jobs list API call to the shared thread pool
+        # Delegate blocking jobs list API call to the dedicated job thread pool
         job_futures.append(
             loop.run_in_executor(
                 _job_executor, get_jobs, pipelineobject, project_id, GLAB_SERVICE_NAME, pipeline_dict
