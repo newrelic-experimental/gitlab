@@ -102,19 +102,12 @@ class GitLabMetricsExporter:
                             "visibility": visibility,
                             "get_all": True,
                         }
-                        # When GLAB_EXPORT_ALL_PROJECTS=true we fetch all projects so that
-                        # pipeline-only-active projects (whose last_activity_at isn't updated
-                        # by pipeline runs) are not missed. Per-resource time filters in
-                        # get_pipelines(), get_deployments(), etc. still bound the window.
-                        #
-                        # When GLAB_EXPORT_ALL_PROJECTS=false the user explicitly scopes to
-                        # recently active projects, so we apply GitLab's server-side
-                        # last_activity_after filter to avoid fetching and iterating over
-                        # projects that would yield no data.
-                        if not GLAB_EXPORT_ALL_PROJECTS:
-                            from datetime import datetime, timedelta, timezone
-                            cutoff = datetime.now(timezone.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
-                            kwargs["last_activity_after"] = cutoff.isoformat()
+                        # NOTE: Do NOT apply last_activity_after here.
+                        # GitLab does NOT update last_activity_at when pipelines run —
+                        # only code pushes, MRs, issues, etc. trigger it.
+                        # A project with a recent pipeline but no recent commits would be
+                        # silently excluded. Time-windowing is handled inside get_pipelines(),
+                        # get_deployments(), get_releases(), and get_jobs() instead.
                         visibility_projects = gl.projects.list(**kwargs)
                         projects.extend(visibility_projects)
 
