@@ -280,6 +280,10 @@ class GitLabMetricsExporter:
                 )
 
                 all_results = []
+                cumulative_queue_stats = {
+                    "total_items": 0, "deployments": 0, "environments": 0,
+                    "releases": 0, "pipelines": 0, "jobs": 0, "errors": 0,
+                }
                 for batch_num in range(total_batches):
                     start_idx = batch_num * batch_size
                     end_idx = min(start_idx + batch_size, len(projects))
@@ -307,6 +311,17 @@ class GitLabMetricsExporter:
                     )
                     all_results.extend(batch_results)
 
+                    # Drain queue after each batch — safe because get_pipelines now
+                    # awaits all job futures before returning, so the queue is fully
+                    # populated by the time asyncio.gather completes above.
+                    batch_queue_stats = self.resource_collector.process_queue()
+                    for key in cumulative_queue_stats:
+                        cumulative_queue_stats[key] += batch_queue_stats.get(key, 0)
+                    self.logger.debug(
+                        f"Batch {batch_num + 1} queue drained: {batch_queue_stats['total_items']} items",
+                        context,
+                        extra={"batch_number": batch_num + 1, **batch_queue_stats},
+                    )
 
                 # Analyze results from all batches
                 results = all_results
@@ -340,19 +355,17 @@ class GitLabMetricsExporter:
                         f"Runners collection failed: {e}"
                     )
 
-                # Process all queued data before completion
-                # This is critical - ensures all data collected from projects is exported
+                # Final queue drain — catches runners data added after the batch loop
                 try:
-                    self.logger.info(
-                        "Processing queued data from all projects", context
-                    )
-                    queue_stats = self.resource_collector.process_queue()
+                    final_queue_stats = self.resource_collector.process_queue()
+                    for key in cumulative_queue_stats:
+                        cumulative_queue_stats[key] += final_queue_stats.get(key, 0)
                     self.logger.info(
                         "Queue processing completed",
                         context,
-                        extra={"queue_stats": queue_stats},
+                        extra={"queue_stats": cumulative_queue_stats},
                     )
-                    collection_results["queue_stats"] = queue_stats
+                    collection_results["queue_stats"] = cumulative_queue_stats
 
                 except Exception as e:
                     self.logger.error("Failed to process queue", context, exception=e)

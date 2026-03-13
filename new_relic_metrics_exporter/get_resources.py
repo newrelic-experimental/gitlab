@@ -18,6 +18,9 @@ from shared.global_variables import *
 from shared.global_variables import OTEL_EXPORTER_TYPE
 from shared.config.settings import get_config
 from shared.utils import generate_service_name
+
+# Cache config at module level — env vars don't change at runtime
+_config = get_config()
 import requests
 import logging
 import asyncio
@@ -34,6 +37,14 @@ global_resource = Resource(attributes=global_resource_attributes)
 # Global logger
 global_logger = get_otel_logger(
     endpoint, headers, global_resource, "global_logger", OTEL_EXPORTER_TYPE
+)
+
+# Shared executor for blocking job-list API calls across all concurrent projects.
+# run_in_executor() delegates the blocking python-gitlab HTTP calls to threads
+# while the asyncio event loop stays free. Max workers is tunable via env var.
+_job_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=int(os.getenv("GLAB_JOB_WORKERS", "20")),
+    thread_name_prefix="glab-jobs",
 )
 
 # Cache GLAB_EXCLUDE_JOBS at module level — env vars don't change at runtime
@@ -185,9 +196,7 @@ def get_runners():
 
 async def grab_data(project):
     try:
-        # Get configuration and generate service name
-        config = get_config()
-        GLAB_SERVICE_NAME = generate_service_name(project, config)
+        GLAB_SERVICE_NAME = generate_service_name(project, _config)
         project_json = json.loads(project.to_json())
         project_namespace_name = (
             str(project.attributes.get("name_with_namespace", "")).lower().replace(" ", "")
@@ -355,8 +364,7 @@ async def grab_data(project):
 
 
 def get_dora_metrics(current_project):
-    config = get_config()
-    GLAB_SERVICE_NAME = generate_service_name(current_project, config)
+    GLAB_SERVICE_NAME = generate_service_name(current_project, _config)
     # Parse project JSON once and reuse
     project_json = json.loads(current_project.to_json())
     project_id = project_json["id"]
@@ -692,11 +700,6 @@ def parse_pipeline(data):
         )
 
 
-def grab_pipeline_data(pipeline_dict, project_id, GLAB_SERVICE_NAME):
-    global q
-    q.put([pipeline_dict, project_id, GLAB_SERVICE_NAME, "pipeline"])
-
-
 async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
     context = LogContext(
         service_name="gitlab-metrics-exporter",
@@ -725,13 +728,24 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
                 _run_stats["window_pipelines"] += pipelines.total or 0
         except Exception:
             pass
-    # setting workers to 5 due to gitlab api limits
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        for pipelineobject in pipelines:
-            # Serialize once here and share with both threads to avoid duplicate to_json() calls
-            pipeline_dict = json.loads(pipelineobject.to_json())
-            executor.submit(grab_pipeline_data, pipeline_dict, project_id, GLAB_SERVICE_NAME)
-            executor.submit(get_jobs, pipelineobject, project_id, GLAB_SERVICE_NAME, pipeline_dict)
+
+    loop = asyncio.get_event_loop()
+    job_futures = []
+    for pipelineobject in pipelines:
+        # Serialize once and share to avoid duplicate to_json() calls
+        pipeline_dict = json.loads(pipelineobject.to_json())
+        # Queue the pipeline record inline — it's just a q.put(), no I/O
+        q.put([pipeline_dict, project_id, GLAB_SERVICE_NAME, "pipeline"])
+        # Delegate blocking jobs list API call to the shared thread pool
+        job_futures.append(
+            loop.run_in_executor(
+                _job_executor, get_jobs, pipelineobject, project_id, GLAB_SERVICE_NAME, pipeline_dict
+            )
+        )
+
+    # Await all job fetches — ensures queue is fully populated before get_pipelines returns
+    if job_futures:
+        await asyncio.gather(*job_futures, return_exceptions=True)
 
 
 def parse_job(data):
