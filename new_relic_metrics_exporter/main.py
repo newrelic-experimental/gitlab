@@ -254,8 +254,10 @@ class GitLabMetricsExporter:
                 # Reset per-run flags so scheduled collections each get a fresh log entry
                 reset_collection_flags()
 
-                # Get projects
-                projects = self.get_projects()
+                # Get projects — blocking paginated API call; run in executor so
+                # the event loop stays free during the initial project listing.
+                loop = asyncio.get_running_loop()
+                projects = await loop.run_in_executor(None, self.get_projects)
                 collection_results["total_projects"] = len(projects)
 
                 if len(projects) == 0:

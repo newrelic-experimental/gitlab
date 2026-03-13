@@ -60,6 +60,9 @@ _exclude_jobs: list = [
     if j.strip()
 ]
 
+# Pre-compile project regex — avoids recompilation on every project evaluation
+_projects_regex = re.compile(str(GLAB_EXPORT_PROJECTS_REGEX))
+
 # Structured logger for this module
 structured_logger = get_structured_logger("gitlab-metrics-exporter", "get-resources")
 
@@ -243,10 +246,8 @@ async def grab_data(project):
                 )
                 structured_logger.info("Log events sent for project", context)
 
-            # Check regex filter
-            regex_check = re.search(
-                str(GLAB_EXPORT_PROJECTS_REGEX), project_json["name"]
-            )
+            # Check regex filter — use pre-compiled pattern (compiled once at module load)
+            regex_check = _projects_regex.search(project_json["name"])
 
             # Log filter configuration information once per run (for diagnostics)
             global _data_collection_mode_logged
@@ -863,7 +864,7 @@ def parse_job(data):
 def get_jobs(pipelineobject, project_id, GLAB_SERVICE_NAME, pipeline_dict):
     global q
     # Use iterator=True to fetch jobs page-by-page so we can stop early
-    jobs = pipelineobject.jobs.list(iterator=True)
+    jobs = pipelineobject.jobs.list(iterator=True, per_page=100)
     current_pipeline_json = pipeline_dict  # reuse the already-serialized dict
     exclude_jobs = _exclude_jobs
     cutoff = (
