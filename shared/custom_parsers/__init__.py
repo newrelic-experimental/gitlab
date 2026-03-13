@@ -244,10 +244,13 @@ def filter_otel_log_attributes(attrs: dict) -> dict:
     2. Drops keys in the hardcoded SENSITIVE_ATTRIBUTES denylist
     3. Drops keys listed in GLAB_ATTRIBUTES_DROP (user-configured, comma-separated,
        applies to all data types including log records)
+
+    After filtering, warns at DEBUG level if the OTEL SDK will truncate further
+    due to OTEL_ATTRIBUTE_COUNT_LIMIT.
     """
     keys_to_drop = SENSITIVE_ATTRIBUTES | frozenset(_ATTRIBUTES_DROP)
 
-    return {
+    filtered = {
         k: v
         for k, v in attrs.items()
         if v is not None
@@ -255,6 +258,18 @@ def filter_otel_log_attributes(attrs: dict) -> dict:
         and v != "None"
         and k.lower() not in keys_to_drop
     }
+
+    limit = int(os.getenv("OTEL_ATTRIBUTE_COUNT_LIMIT", "128"))
+    if len(filtered) > limit:
+        all_keys = list(filtered.keys())
+        will_be_dropped = all_keys[limit:]
+        _log = get_logger("gitlab-exporter", "custom-parsers")
+        _log.warning(
+            f"OTEL will drop {len(will_be_dropped)} attributes (limit={limit}, have={len(filtered)}): "
+            f"{will_be_dropped}"
+        )
+
+    return filtered
 
 
 def parse_attributes(obj, prefix=""):
