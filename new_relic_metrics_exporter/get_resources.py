@@ -323,7 +323,8 @@ async def grab_data(project):
                     )
                 if GLAB_DORA_METRICS:
                     try:
-                        get_dora_metrics(project)
+                        loop = asyncio.get_running_loop()
+                        await loop.run_in_executor(_executor, get_dora_metrics, project)
                     except Exception as e:
                         context = LogContext(
                             service_name="gitlab-metrics-exporter",
@@ -1009,8 +1010,9 @@ class EnhancedResourceCollector:
         try:
             self.logger.info("Starting runners data collection", context)
 
-            # Use the existing get_runners function
-            get_runners()
+            # Offload blocking HTTP calls to the thread pool
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(_executor, get_runners)
 
             self.logger.info("Runners data collection completed", context)
 
@@ -1084,20 +1086,19 @@ class EnhancedResourceCollector:
                 )
                 return None
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {executor.submit(process_item, item): item for item in items}
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    result_type = future.result()
-                    if result_type:
-                        stats[result_type] += 1
-                except Exception as e:
-                    stats["errors"] += 1
-                    self.logger.error(
-                        "Error processing queue item",
-                        context,
-                        exception=e,
-                    )
+        futures = {_executor.submit(process_item, item): item for item in items}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result_type = future.result()
+                if result_type:
+                    stats[result_type] += 1
+            except Exception as e:
+                stats["errors"] += 1
+                self.logger.error(
+                    "Error processing queue item",
+                    context,
+                    exception=e,
+                )
 
         self.logger.info(
             f"Queue processing completed - processed {stats['total_items']} items",
