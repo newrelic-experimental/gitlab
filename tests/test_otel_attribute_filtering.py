@@ -305,9 +305,10 @@ class TestParseAttributesFiltering:
             "also_drop": "also_drop_value",
         }
 
-        test_env = {"GLAB_ATTRIBUTES_DROP": "drop_this,also_drop"}
-
-        with patch.dict(os.environ, test_env, clear=True):
+        import shared.custom_parsers as cp
+        original = cp._ATTRIBUTES_DROP
+        cp._ATTRIBUTES_DROP = ["drop_this", "also_drop"]
+        try:
             result = parse_attributes(test_obj)
 
             # Should keep attributes not in drop list
@@ -316,6 +317,8 @@ class TestParseAttributesFiltering:
             # Should drop attributes in custom drop list
             assert "drop_this" not in result
             assert "also_drop" not in result
+        finally:
+            cp._ATTRIBUTES_DROP = original
 
 
 class TestResourceCreationFiltering:
@@ -393,6 +396,124 @@ class TestResourceCreationFiltering:
         # Should be able to create Resource with empty attributes
         resource = Resource(attributes=filtered_attrs)
         assert isinstance(resource, Resource)
+
+
+class TestFilterOtelLogAttributes:
+    """Test suite for filter_otel_log_attributes function."""
+
+    def test_removes_none_values(self):
+        """filter_otel_log_attributes drops None values."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes({"key": None, "valid": "ok"})
+        assert "key" not in result
+        assert result["valid"] == "ok"
+
+    def test_removes_empty_string(self):
+        """filter_otel_log_attributes drops empty string values."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes({"key": "", "valid": "ok"})
+        assert "key" not in result
+
+    def test_removes_none_string(self):
+        """filter_otel_log_attributes drops the string 'None'."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes({"key": "None", "valid": "ok"})
+        assert "key" not in result
+
+    def test_all_invalid_values_dropped(self):
+        """filter_otel_log_attributes drops all invalid values at once."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes({"k1": None, "k2": "None", "k3": ""})
+        assert result == {}
+
+    def test_preserves_zero_and_false(self):
+        """filter_otel_log_attributes keeps 0 and False (valid values)."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes({"zero": 0, "flag": False, "valid": "ok"})
+        assert result["zero"] == 0
+        assert result["flag"] is False
+        assert result["valid"] == "ok"
+
+    def test_drops_sensitive_attributes(self):
+        """filter_otel_log_attributes drops hardcoded sensitive keys."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes({
+            "NEW_RELIC_API_KEY": "secret",
+            "GLAB_TOKEN": "secret",
+            "CI_JOB_JWT": "token",
+            "CI_JOB_TOKEN": "token",
+            "CI_BUILD_TOKEN": "token",
+            "CI_REGISTRY_PASSWORD": "password",
+            "CI_DEPLOY_PASSWORD": "password",
+            "CI_SERVER_TLS_KEY_FILE": "/path/to/key",
+            "CI_SERVER_TLS_CERT_FILE": "/path/to/cert",
+            "valid_attr": "keep",
+        })
+        assert "NEW_RELIC_API_KEY" not in result
+        assert "GLAB_TOKEN" not in result
+        assert "CI_JOB_JWT" not in result
+        assert "CI_JOB_TOKEN" not in result
+        assert "CI_BUILD_TOKEN" not in result
+        assert "CI_REGISTRY_PASSWORD" not in result
+        assert "CI_DEPLOY_PASSWORD" not in result
+        assert "CI_SERVER_TLS_KEY_FILE" not in result
+        assert "CI_SERVER_TLS_CERT_FILE" not in result
+        assert result["valid_attr"] == "keep"
+
+    def test_sensitive_key_check_is_case_insensitive(self):
+        """Sensitive key matching is case-insensitive."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes({
+            "new_relic_api_key": "secret",
+            "Glab_Token": "secret",
+        })
+        assert "new_relic_api_key" not in result
+        assert "Glab_Token" not in result
+
+    def test_honors_glab_attributes_drop(self):
+        """filter_otel_log_attributes respects GLAB_ATTRIBUTES_DROP."""
+        from shared.custom_parsers import filter_otel_log_attributes
+        import shared.custom_parsers as cp
+
+        original = cp._ATTRIBUTES_DROP
+        cp._ATTRIBUTES_DROP = ["status", "stage"]
+        try:
+            result = filter_otel_log_attributes({
+                "status": "success",
+                "stage": "build",
+                "name": "my-job",
+            })
+            assert "status" not in result
+            assert "stage" not in result
+            assert result["name"] == "my-job"
+        finally:
+            cp._ATTRIBUTES_DROP = original
+
+    def test_glab_attributes_drop_is_case_insensitive(self):
+        """GLAB_ATTRIBUTES_DROP matching is case-insensitive (stored lowercase)."""
+        from shared.custom_parsers import filter_otel_log_attributes
+        import shared.custom_parsers as cp
+
+        # Cache stores lowercase; test that lowercase entries filter case-insensitively
+        original = cp._ATTRIBUTES_DROP
+        cp._ATTRIBUTES_DROP = ["status", "stage"]
+        try:
+            result = filter_otel_log_attributes({
+                "Status": "success",
+                "STAGE": "build",
+                "name": "my-job",
+            })
+            assert "Status" not in result
+            assert "STAGE" not in result
+        finally:
+            cp._ATTRIBUTES_DROP = original
 
 
 class TestIntegrationFiltering:

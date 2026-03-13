@@ -12,7 +12,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from opentelemetry.trace import Status, StatusCode
 from shared.custom_parsers import do_time, parse_attributes, do_parse, log_attributes_debug
-from shared.otel import create_resource_attributes, get_tracer, get_logger
+from shared.otel import create_resource_attributes, get_tracer, get_otel_logger
 from shared.logging.structured_logger import (
     get_logger as get_structured_logger,
     LogContext,

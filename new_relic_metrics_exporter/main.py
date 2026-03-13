@@ -7,6 +7,7 @@ with proper error handling, performance monitoring, and structured logging.
 
 import asyncio
 import datetime
+import os
 import time
 import logging
 import sys
@@ -28,9 +29,10 @@ from shared.global_variables import (
     GLAB_PROJECT_OWNERSHIP,
     GLAB_STANDALONE,
     GLAB_EXPORT_LAST_MINUTES,
+    GLAB_EXPORT_ALL_PROJECTS,
 )
-from get_resources import EnhancedResourceCollector, global_logger
-from shared.otel import flush_otel_logs, get_otel_queue_stats
+from get_resources import EnhancedResourceCollector, global_logger, global_meter, reset_collection_flags
+from shared.otel import shutdown_otel_providers
 
 
 class GitLabMetricsExporter:
@@ -95,11 +97,25 @@ class GitLabMetricsExporter:
 
                 for visibility in GLAB_PROJECT_VISIBILITIES:
                     try:
-                        visibility_projects = gl.projects.list(
-                            owned=GLAB_PROJECT_OWNERSHIP,
-                            visibility=visibility,
-                            get_all=True,
-                        )
+                        kwargs = {
+                            "owned": GLAB_PROJECT_OWNERSHIP,
+                            "visibility": visibility,
+                            "get_all": True,
+                        }
+                        # When GLAB_EXPORT_ALL_PROJECTS=true we fetch all projects so that
+                        # pipeline-only-active projects (whose last_activity_at isn't updated
+                        # by pipeline runs) are not missed. Per-resource time filters in
+                        # get_pipelines(), get_deployments(), etc. still bound the window.
+                        #
+                        # When GLAB_EXPORT_ALL_PROJECTS=false the user explicitly scopes to
+                        # recently active projects, so we apply GitLab's server-side
+                        # last_activity_after filter to avoid fetching and iterating over
+                        # projects that would yield no data.
+                        if not GLAB_EXPORT_ALL_PROJECTS:
+                            from datetime import datetime, timedelta, timezone
+                            cutoff = datetime.now(timezone.utc) - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
+                            kwargs["last_activity_after"] = cutoff.isoformat()
+                        visibility_projects = gl.projects.list(**kwargs)
                         projects.extend(visibility_projects)
 
                         self.logger.debug(
@@ -230,6 +246,7 @@ class GitLabMetricsExporter:
             operation="run_collection",
         )
 
+        run_start = time.time()
         collection_results = {
             "start_time": datetime.datetime.now().isoformat(),
             "total_projects": 0,
@@ -241,6 +258,9 @@ class GitLabMetricsExporter:
 
         with self.logger.operation_timer("run_collection", context) as timer:
             try:
+                # Reset per-run flags so scheduled collections each get a fresh log entry
+                reset_collection_flags()
+
                 # Get projects
                 projects = self.get_projects()
                 collection_results["total_projects"] = len(projects)
@@ -249,21 +269,15 @@ class GitLabMetricsExporter:
                     self.logger.warning("No projects found to export", context)
                     return collection_results
 
-                # Log which projects will be processed
-                project_names = [project.name for project in projects]
-
                 self.logger.info(
                     f"Starting concurrent processing of {len(projects)} projects",
                     context,
-                    extra={
-                        "project_count": len(projects),
-                        "projects": project_names,
-                    },
+                    extra={"project_count": len(projects)},
                 )
 
                 # Process projects in batches to allow periodic flushing
                 # This prevents OTEL queue overflow when processing 1000+ projects
-                batch_size = 100
+                batch_size = int(os.getenv("GLAB_EXPORT_BATCH_SIZE", "100"))
                 total_batches = (len(projects) + batch_size - 1) // batch_size
 
                 self.logger.info(
@@ -300,30 +314,6 @@ class GitLabMetricsExporter:
                     )
                     all_results.extend(batch_results)
 
-                    # Force flush after each batch to prevent queue overflow
-                    self.logger.info(
-                        f"Flushing logs after batch {batch_num + 1}/{total_batches}",
-                        context,
-                    )
-                    flush_otel_logs(global_logger)
-                    self.logger.info(
-                        f"Batch {batch_num + 1} flushed successfully", context
-                    )
-
-                    # Monitor OTEL queue for potential overflow
-                    queue_stats = get_otel_queue_stats(global_logger)
-                    if queue_stats and not queue_stats.get("error"):
-                        self.logger.info(
-                            f"OTEL queue status after batch {batch_num + 1}/{total_batches}",
-                            context,
-                            extra=queue_stats
-                        )
-                        if queue_stats.get("is_at_risk"):
-                            self.logger.warning(
-                                f"⚠️  OTEL queue at {queue_stats.get('queue_utilization_pct', 0)}% capacity - risk of data loss",
-                                context,
-                                extra=queue_stats
-                            )
 
                 # Analyze results from all batches
                 results = all_results
@@ -349,14 +339,6 @@ class GitLabMetricsExporter:
                     await self.resource_collector.collect_runners_data()
                     self.logger.info("Runners data collection completed", context)
 
-                    # CRITICAL: Force flush runner logs to OTEL exporter immediately
-                    # Runners log directly via global_logger (not through queue)
-                    # Must export before container exits
-                    self.logger.info(
-                        "Force flushing runner logs to ensure export", context
-                    )
-                    flush_otel_logs(global_logger)
-                    self.logger.info("Runner logs flushed successfully", context)
                 except Exception as e:
                     self.logger.error(
                         "Failed to collect runners data", context, exception=e
@@ -379,20 +361,21 @@ class GitLabMetricsExporter:
                     )
                     collection_results["queue_stats"] = queue_stats
 
-                    # Force flush project data logs immediately after processing queue
-                    if queue_stats["total_items"] > 0:
-                        self.logger.info(
-                            "Force flushing project data logs to ensure export", context
-                        )
-                        flush_otel_logs(global_logger)
-                        self.logger.info(
-                            "Project data logs flushed successfully", context
-                        )
                 except Exception as e:
                     self.logger.error("Failed to process queue", context, exception=e)
                     collection_results["errors"].append(f"Queue processing failed: {e}")
 
-                collection_results["duration_seconds"] = time.time() - self.start_time
+                collection_results["duration_seconds"] = time.time() - run_start
+
+                # Emit estate + window summary to New Relic
+                try:
+                    emit_collection_summary(collection_results, projects)
+                    self.logger.info("Collection summary event emitted", context)
+                except Exception as e:
+                    self.logger.error(
+                        "Failed to emit collection summary", context, exception=e
+                    )
+
                 timer["success"] = True
 
                 # Log completion summary with project details
@@ -411,9 +394,15 @@ class GitLabMetricsExporter:
                             )
 
                 completion_summary = {
-                    **collection_results,
-                    "successful_projects_list": successful_projects,
-                    "failed_projects_list": failed_projects,
+                    "start_time": collection_results["start_time"],
+                    "duration_seconds": collection_results["duration_seconds"],
+                    "total_projects": collection_results["total_projects"],
+                    "successful_projects": collection_results["successful_projects"],
+                    "failed_projects": collection_results["failed_projects"],
+                    "errors_count": len(collection_results["errors"]),
+                    # Cap lists to avoid oversized OTEL payloads on large instances
+                    "failed_projects_sample": failed_projects[:10],
+                    "queue_stats": collection_results.get("queue_stats", {}),
                 }
 
                 self.logger.info(
@@ -443,17 +432,10 @@ class GitLabMetricsExporter:
 
         try:
             # Run initial collection
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            try:
-                results = loop.run_until_complete(self.run_collection())
-                self.logger.log_performance_metrics(
-                    "initial_collection", results, context
-                )
-            finally:
-                loop.close()
-                asyncio.set_event_loop(None)
+            results = asyncio.run(self.run_collection())
+            self.logger.log_performance_metrics(
+                "initial_collection", results, context
+            )
 
             # Schedule recurring collections
             schedule.every(int(GLAB_EXPORT_LAST_MINUTES)).minutes.do(
@@ -501,19 +483,13 @@ class GitLabMetricsExporter:
 
         self.logger.info("Starting scheduled collection", context)
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         try:
-            results = loop.run_until_complete(self.run_collection())
+            results = asyncio.run(self.run_collection())
             self.logger.log_performance_metrics(
                 "scheduled_collection", results, context
             )
         except Exception as e:
             self.logger.error("Scheduled collection failed", context, exception=e)
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
 
 
 def main():
@@ -525,25 +501,18 @@ def main():
             exporter.run_standalone_mode()
         else:
             # Run once
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            results = asyncio.run(exporter.run_collection())
+            context = LogContext(
+                service_name="gitlab-metrics-exporter",
+                component="main",
+                operation="main",
+            )
+            exporter.logger.info(
+                "Collection completed", context, extra={"results": results}
+            )
 
-            try:
-                results = loop.run_until_complete(exporter.run_collection())
-                context = LogContext(
-                    service_name="gitlab-metrics-exporter",
-                    component="main",
-                    operation="main",
-                )
-                exporter.logger.info(
-                    "Collection completed", context, extra={"results": results}
-                )
-            finally:
-                loop.close()
-                asyncio.set_event_loop(None)
-
-                if hasattr(gl, "session"):
-                    gl.session.close()
+            if hasattr(gl, "session"):
+                gl.session.close()
 
     except Exception as e:
         context = LogContext(
@@ -557,16 +526,13 @@ def main():
         raise
     finally:
         # Shutdown OTEL providers to ensure all data is exported
-        import time
-        from shared.otel import shutdown_otel_providers
-
         shutdown_start = time.time()
         print(
             f"[MAIN] Initiating OTEL shutdown at {time.strftime('%H:%M:%S')}...",
             file=sys.stderr,
             flush=True,
         )
-        shutdown_success = shutdown_otel_providers(global_logger)
+        shutdown_success = shutdown_otel_providers(global_logger, meter=global_meter)
         shutdown_duration = time.time() - shutdown_start
         print(
             f"[MAIN] OTEL shutdown {'successful' if shutdown_success else 'completed with warnings'} in {shutdown_duration:.2f}s",

@@ -32,11 +32,22 @@ global GLAB_RUNNERS_INSTANCE
 # Initializing a queue
 q = Queue()
 
+# OTEL defaults — applied only if not already set in the environment
+# Customers can override any of these via their own environment variables
+os.environ.setdefault("OTEL_ATTRIBUTE_COUNT_LIMIT", "64")
+os.environ.setdefault("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "4096")
+os.environ.setdefault("OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT", "64")
+os.environ.setdefault("OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT", "4096")
+os.environ.setdefault("OTEL_BLRP_SCHEDULE_DELAY", "2000")
+os.environ.setdefault("OTEL_BLRP_MAX_QUEUE_SIZE", "20000")
+os.environ.setdefault("OTEL_BLRP_MAX_EXPORT_BATCH_SIZE", "2000")
+os.environ.setdefault("OTEL_EXPORTER_OTLP_TIMEOUT", "60000")
+
 GLAB_DORA_METRICS = False
 GLAB_EXPORT_LOGS = True
 GLAB_STANDALONE = False
 GLAB_EXPORT_LAST_MINUTES = 61
-GLAB_EXPORT_ALL_PROJECTS = True
+GLAB_EXPORT_ALL_PROJECTS = False
 GLAB_PROJECT_OWNERSHIP = True
 GLAB_PROJECT_VISIBILITIES = [
     "private",
@@ -60,8 +71,6 @@ if (
     and os.getenv("GLAB_RUNNERS_INSTANCE").lower() == "false"
 ):
     GLAB_RUNNERS_INSTANCE = False
-else:
-    GLAB_RUNNERS_INSTANCE = True
 
 
 # Check export logs is set
@@ -102,7 +111,14 @@ else:
 if GLAB_EXPORT_PATHS != "":
     paths = GLAB_EXPORT_PATHS.split(",")
 else:
-    paths = ""
+    paths = []
+    if not GLAB_EXPORT_PATHS_ALL:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "GLAB_EXPORT_PATHS is not set and GLAB_EXPORT_PATHS_ALL is False. "
+            "Detailed resource data (pipelines, deployments, etc.) will NOT be exported for any project. "
+            "Set GLAB_EXPORT_PATHS or set GLAB_EXPORT_PATHS_ALL=true to enable detailed export."
+        )
 
 # Set gitlab client
 GLAB_ENDPOINT = ""
@@ -136,9 +152,9 @@ if "GLAB_EXPORT_LAST_MINUTES" in os.environ:
 # Check if we should export all projects regardless of activity
 if (
     "GLAB_EXPORT_ALL_PROJECTS" in os.environ
-    and os.getenv("GLAB_EXPORT_ALL_PROJECTS").lower() == "false"
+    and os.getenv("GLAB_EXPORT_ALL_PROJECTS").lower() == "true"
 ):
-    GLAB_EXPORT_ALL_PROJECTS = False
+    GLAB_EXPORT_ALL_PROJECTS = True
 
 # Check which datacentre we exporting our data to
 if "OTEL_EXPORTER_OTEL_ENDPOINT" in os.environ:

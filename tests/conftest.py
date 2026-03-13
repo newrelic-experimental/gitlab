@@ -3,6 +3,29 @@ import os
 import sys
 from unittest.mock import MagicMock, patch
 
+# Stub out grpc and OTLP gRPC exporters before any test modules are imported.
+# grpc._cython.cygrpc fails to load on this Python 3.13 environment because the
+# pre-built wheel's Cython extension is not compatible. Stubbing here prevents
+# ImportError during collection while still allowing the patch() calls below to
+# replace the exporter classes in shared.otel at test runtime.
+for _mod in (
+    "grpc",
+    "grpc._cython",
+    "grpc._cython.cygrpc",
+    "opentelemetry.exporter.otlp.proto.grpc",
+    "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.metric_exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+):
+    if _mod not in sys.modules:
+        sys.modules[_mod] = MagicMock()
+
+# Ensure the exporter classes resolve to MagicMock instances so shared.otel
+# can import them successfully.
+sys.modules["opentelemetry.exporter.otlp.proto.grpc._log_exporter"].OTLPLogExporter = MagicMock()
+sys.modules["opentelemetry.exporter.otlp.proto.grpc.metric_exporter"].OTLPMetricExporter = MagicMock()
+sys.modules["opentelemetry.exporter.otlp.proto.grpc.trace_exporter"].OTLPSpanExporter = MagicMock()
+
 
 @pytest.fixture(autouse=True)
 def mock_otel_exporters():
@@ -10,15 +33,15 @@ def mock_otel_exporters():
     from unittest.mock import MagicMock
 
     with patch(
-        "opentelemetry.exporter.otlp.proto.grpc.trace_exporter.OTLPSpanExporter"
+        "shared.otel.OTLPSpanExporter"
     ) as mock_span_exporter, patch(
-        "opentelemetry.exporter.otlp.proto.grpc.metric_exporter.OTLPMetricExporter"
+        "shared.otel.OTLPMetricExporter"
     ) as mock_metric_exporter, patch(
-        "opentelemetry.exporter.otlp.proto.grpc._log_exporter.OTLPLogExporter"
+        "shared.otel.OTLPLogExporter"
     ) as mock_log_exporter, patch(
         "shared.otel.get_tracer"
     ) as mock_get_tracer, patch(
-        "shared.otel.get_logger"
+        "shared.otel.get_otel_logger"
     ) as mock_get_logger, patch(
         "shared.otel.get_meter"
     ) as mock_get_meter, patch(
@@ -26,7 +49,7 @@ def mock_otel_exporters():
     ) as mock_pipeline_tracer, patch(
         "new_relic_exporter.processors.job_processor.get_tracer"
     ) as mock_job_tracer, patch(
-        "new_relic_exporter.processors.job_processor.get_logger"
+        "new_relic_exporter.processors.job_processor.get_otel_logger"
     ) as mock_job_logger, patch(
         "new_relic_exporter.processors.bridge_processor.get_tracer"
     ) as mock_bridge_tracer:

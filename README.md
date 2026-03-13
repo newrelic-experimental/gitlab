@@ -44,8 +44,8 @@ This project consists of two main components:
 - **Use Case**: High-level monitoring and alerting across multiple projects
 - **Deployment**: Can run standalone or as scheduled GitLab pipeline
 - **Data Collection**: 
-  - Project metadata export is configurable via `GLAB_EXPORT_ALL_PROJECTS` (default: exports all projects as a snapshot)
-  - Event data (pipelines, jobs, deployments, releases) is filtered by `GLAB_EXPORT_LAST_MINUTES` to collect only recent activity
+  - Project metadata and event data are filtered by `GLAB_EXPORT_LAST_MINUTES` (default: 60 minutes) to collect only recent activity
+  - Set `GLAB_EXPORT_ALL_PROJECTS=true` to export all historical data regardless of activity window
 
 ## Configuration System
 
@@ -74,6 +74,7 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 | `GLAB_EXCLUDE_JOBS` | Comma-separated list of job or bridge names or stages to exclude from export (e.g. "build,test,deploy,bridge-stage") | True | List* | None |
 | `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
+| `OTEL_EXPORTER_TYPE` | OTEL exporter output target. `otlp` sends to New Relic, `console` prints to stderr, `both` does both (useful for debugging) | True | String | otlp |
 | `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
 
 # New Relic Metrics Exporter 
@@ -93,14 +94,16 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_EXPORT_PATHS_ALL` | When True ignore GLAB_EXPORT_PATHS variable and export projects matching GLAB_EXPORT_PROJECTS_REGEX in any groups or subgroups| True |  Boolean | False |
 | `GLAB_CONVERT_TO_TIMESTAMP` | converts datetime to timestamp | True | Boolean | False |
 | `GLAB_EXPORT_LAST_MINUTES` | Time window (in minutes) for collecting event data (pipelines, jobs, deployments, releases). When GLAB_EXPORT_ALL_PROJECTS=False, also applies to project metadata. | True | Integer | 60 |
-| `GLAB_EXPORT_ALL_PROJECTS` | When True, always export all project metadata regardless of last activity. When False, only export projects with activity within GLAB_EXPORT_LAST_MINUTES window (legacy behavior). | True | Boolean | True |
-| `GLAB_ATTRIBUTES_DROP` | Attributes to drop from logs and spans events | True | List* | None |
+| `GLAB_EXPORT_ALL_PROJECTS` | When False (default), only export projects with activity within GLAB_EXPORT_LAST_MINUTES window. When True, export all historical data regardless of activity. | True | Boolean | False |
+| `GLAB_ATTRIBUTES_DROP` | Attribute keys to drop from all exported data (log records, spans, parsed entity attributes). Comma-separated. Applied at every export point including OTEL log records. | True | List* | None |
 | `GLAB_DIMENSION_METRICS` | Extra dimensional metric attributes to add to each metric | True | List* | NONE Note the following attributes will always be set as dimensions regardless of this setting: status,stage,name |
 | `GLAB_RUNNERS_SCOPE` | Get runners scope : all, active, paused, online, shared, specific (separated by comma) | True | List* | all |
 | `GLAB_STANDALONE` | Set to True if not running as gitlab pipeline schedule | True | Boolean | False |
-| `GLAB_ENVS_DROP` | Extra system environment variables to drop from span attributes | True | List* | Note the following environment variables will always be dropped regardless of this setting: NEW_RELIC_API_KEY,GITLAB_FEATURES,CI_SERVER_TLS_CA_FILE,CI_RUNNER_TAGS,CI_JOB_JWT,CI_JOB_JWT_V1,CI_JOB_JWT_V2,GLAB_TOKEN,GIT_ASKPASS,CI_COMMIT_BEFORE_SHA,CI_BUILD_TOKEN,CI_DEPENDENCY_PROXY_PASSWORD,CI_RUNNER_SHORT_TOKEN,CI_BUILD_BEFORE_SHA,CI_BEFORE_SHA,OTEL_EXPORTER_OTEL_ENDPOINT,GLAB_DIMENSION_METRICS |
+| `GLAB_ENVS_DROP` | Extra system environment variables to drop from span attributes | True | List* | Note the following environment variables will always be dropped regardless of this setting: NEW_RELIC_API_KEY,GLAB_TOKEN,CI_JOB_JWT,CI_JOB_JWT_V1,CI_JOB_JWT_V2,CI_JOB_TOKEN,CI_BUILD_TOKEN,CI_REGISTRY_PASSWORD,CI_DEPLOY_PASSWORD,CI_DEPENDENCY_PROXY_PASSWORD,CI_RUNNER_SHORT_TOKEN,CI_SERVER_TLS_CA_FILE,CI_SERVER_TLS_CERT_FILE,CI_SERVER_TLS_KEY_FILE,CI_RUNNER_TAGS,GIT_ASKPASS,CI_COMMIT_BEFORE_SHA,CI_BUILD_BEFORE_SHA,CI_BEFORE_SHA,GITLAB_FEATURES,OTEL_EXPORTER_OTEL_ENDPOINT,GLAB_EXPORT_PATHS,GLAB_EXPORT_PATHS_ALL,GLAB_EXPORT_PROJECTS_REGEX |
 | `GLAB_EXCLUDE_JOBS` | Comma-separated list of job or bridge names or stages to exclude from export (e.g. "build,test,deploy,bridge-stage") | True | List* | None |
 | `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
+| `GLAB_SUMMARY_ESTATE_COUNTS` | Include all-time total pipeline/deployment/release counts in the collection summary event. **Warning**: makes 3 API calls per project — very slow on large instances. | True | Boolean | False |
+| `OTEL_EXPORTER_TYPE` | OTEL exporter output target. `otlp` sends to New Relic, `console` prints to stderr, `both` does both (useful for debugging) | True | String | otlp |
 | `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
 *comma separated
 
@@ -241,6 +244,18 @@ Both exporters include comprehensive health monitoring and structured logging:
 - **Performance Metrics**: Built-in timing and performance tracking
 - **Error Handling**: Graceful error handling with detailed error context
 - **Configuration Validation**: Startup validation of all required settings
+- **Graceful OTEL Shutdown**: All providers are explicitly shut down before exit, ensuring batched traces, logs, and metrics are fully exported and not lost
+- **OTEL Queue Monitoring**: Active queue depth monitoring during export; warnings are emitted when the batch queue approaches capacity
+
+### Large-Scale Deployments
+
+When exporting from GitLab instances with many projects (100+), the metrics exporter uses batched processing to prevent OTEL queue overflow:
+
+- Projects are processed in batches of 100
+- OTEL logs are flushed after each batch
+- Queue depth is monitored between batches and logged
+
+If you observe dropped telemetry at scale, set `LOG_LEVEL=DEBUG` to inspect queue stats and tune `GLAB_EXPORT_LAST_MINUTES` or `GLAB_EXPORT_ALL_PROJECTS` accordingly.
 
 ### Security Considerations
 
@@ -286,8 +301,8 @@ Both exporters include comprehensive health monitoring and structured logging:
 
 6. **Missing Project Data (Standalone Deployment)**
    - **Problem**: Projects without recent activity are not appearing on dashboards
-   - **Cause**: `GLAB_EXPORT_ALL_PROJECTS` is set to `false` or legacy deployment
-   - **Solution**: Set `GLAB_EXPORT_ALL_PROJECTS=true` (default since v2.1.0) to export all project metadata as a snapshot. Set to `false` only if you want the legacy behavior of time-filtered project exports.
+   - **Cause**: `GLAB_EXPORT_ALL_PROJECTS=false` (default) only exports projects active within the `GLAB_EXPORT_LAST_MINUTES` window
+   - **Solution**: Set `GLAB_EXPORT_ALL_PROJECTS=true` to export all project metadata regardless of activity, or increase `GLAB_EXPORT_LAST_MINUTES` to widen the time window.
 
 ### Debug Mode
 
@@ -304,7 +319,7 @@ We encourage your contributions to improve [GitLab Exporters](../../)! Keep in m
 
 ### Development Guidelines
 
-- All code must pass the comprehensive test suite (322 tests)
+- All code must pass the comprehensive test suite (339 tests)
 - Follow the existing code structure and patterns
 - Add tests for new functionality
 - Update documentation for configuration changes

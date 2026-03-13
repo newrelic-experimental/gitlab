@@ -312,9 +312,9 @@ class TestConftestAutoFixtures:
     def test_mock_logger_functionality(self):
         """Test that mocked logger provides expected functionality."""
         try:
-            from shared.otel import get_logger
+            from shared.otel import get_otel_logger
 
-            logger = get_logger("endpoint", {}, MagicMock(), "test-logger")
+            logger = get_otel_logger("endpoint", {}, MagicMock(), "test-logger")
 
             # Should be able to call logger methods without errors
             assert logger is not None

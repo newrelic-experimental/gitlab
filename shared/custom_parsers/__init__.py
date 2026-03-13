@@ -12,6 +12,36 @@ logger = logging.getLogger(__name__)
 # Import structured logger components for use in functions
 from shared.logging.structured_logger import get_logger, LogContext
 
+# Hardcoded sensitive attribute denylist — shared by grab_span_att_vars() and
+# filter_otel_log_attributes() so both functions enforce the same rules.
+# Keys are stored lowercase for case-insensitive comparison.
+SENSITIVE_ATTRIBUTES = frozenset({
+    "new_relic_api_key",
+    "glab_token",
+    "ci_job_jwt",
+    "ci_job_jwt_v1",
+    "ci_job_jwt_v2",
+    "ci_job_token",
+    "ci_build_token",
+    "ci_registry_password",
+    "ci_deploy_password",
+    "ci_dependency_proxy_password",
+    "ci_runner_short_token",
+    "ci_server_tls_ca_file",
+    "ci_server_tls_cert_file",
+    "ci_server_tls_key_file",
+    "ci_runner_tags",
+    "git_askpass",
+    "ci_commit_before_sha",
+    "ci_build_before_sha",
+    "ci_before_sha",
+    "gitlab_features",
+    "otel_exporter_otel_endpoint",
+    "glab_export_paths",
+    "glab_export_paths_all",
+    "glab_export_projects_regex",
+})
+
 GLAB_CONVERT_TO_TIMESTAMP = False
 
 # Check export logs is set
@@ -22,6 +52,18 @@ if (
     GLAB_CONVERT_TO_TIMESTAMP = True
 else:
     GLAB_CONVERT_TO_TIMESTAMP = False
+
+# Cache attribute/dimension drop lists at module level — env vars don't change at runtime
+_ATTRIBUTES_DROP: list = [
+    a.strip().lower()
+    for a in os.getenv("GLAB_ATTRIBUTES_DROP", "").split(",")
+    if a.strip()
+]
+_DIMENSION_METRICS: list = [
+    d.strip().lower()
+    for d in os.getenv("GLAB_DIMENSION_METRICS", "").split(",")
+    if d.strip()
+]
 
 
 def do_time(string):
@@ -34,7 +76,7 @@ def do_time(string):
         return None
     try:
         parsed_time = parse(string)
-        timestamp_ns = int(round(time.mktime(parsed_time.timetuple())) * 1000000000)
+        timestamp_ns = int(parsed_time.timestamp() * 1_000_000_000)
         logger.debug(
             f"Successfully parsed timestamp '{string}' to {timestamp_ns} nanoseconds"
         )
@@ -145,27 +187,9 @@ def grab_span_att_vars():
         for key in keys_to_remove:
             atts.pop(key, None)
 
-        atts_to_remove = [
-            "NEW_RELIC_API_KEY",
-            "GITLAB_FEATURES",
-            "CI_SERVER_TLS_CA_FILE",
-            "CI_RUNNER_TAGS",
-            "CI_JOB_JWT",
-            "CI_JOB_JWT_V1",
-            "CI_JOB_JWT_V2",
-            "GLAB_TOKEN",
-            "GIT_ASKPASS",
-            "CI_COMMIT_BEFORE_SHA",
-            "CI_BUILD_TOKEN",
-            "CI_DEPENDENCY_PROXY_PASSWORD",
-            "CI_RUNNER_SHORT_TOKEN",
-            "CI_BUILD_BEFORE_SHA",
-            "CI_BEFORE_SHA",
-            "OTEL_EXPORTER_OTEL_ENDPOINT",
-            "GLAB_EXPORT_PATHS",
-            "GLAB_EXPORT_PATHS_ALL",
-            "GLAB_EXPORT_PROJECTS_REGEX",
-        ]
+        # Build remove list from the shared sensitive denylist (stored lowercase,
+        # so match case-insensitively against the actual env var keys).
+        atts_to_remove = [k for k in atts if k.lower() in SENSITIVE_ATTRIBUTES]
         if "GLAB_ENVS_DROP" in os.environ:
             try:
                 if os.getenv("GLAB_ENVS_DROP") != "":
@@ -211,6 +235,28 @@ def grab_span_att_vars():
     return filtered_atts
 
 
+def filter_otel_log_attributes(attrs: dict) -> dict:
+    """
+    Filter attributes before sending as OTEL log record extra fields.
+
+    Applies in order:
+    1. Removes None, empty string, and 'None' string values
+    2. Drops keys in the hardcoded SENSITIVE_ATTRIBUTES denylist
+    3. Drops keys listed in GLAB_ATTRIBUTES_DROP (user-configured, comma-separated,
+       applies to all data types including log records)
+    """
+    keys_to_drop = SENSITIVE_ATTRIBUTES | frozenset(_ATTRIBUTES_DROP)
+
+    return {
+        k: v
+        for k, v in attrs.items()
+        if v is not None
+        and v != ""
+        and v != "None"
+        and k.lower() not in keys_to_drop
+    }
+
+
 def parse_attributes(obj, prefix=""):
     """
     Enhanced attribute parser that flattens GitLab job data into key-value pairs.
@@ -218,32 +264,12 @@ def parse_attributes(obj, prefix=""):
     Handles nested objects, JSON strings, and arrays by flattening them with dot notation.
     """
     obj_atts = {}
-    attributes_to_drop = [""]
+    # Use module-level cached drop list (empty string sentinel + user-configured drops)
+    attributes_to_drop = [""] + _ATTRIBUTES_DROP
 
     # Handle the case where obj is a list (from JSON parsing)
     if isinstance(obj, list):
         return _flatten_array(obj, prefix)
-
-    if "GLAB_ATTRIBUTES_DROP" in os.environ:
-        try:
-            if os.getenv("GLAB_ATTRIBUTES_DROP") != "":
-                user_attributes_to_drop = (
-                    str(os.getenv("GLAB_ATTRIBUTES_DROP")).lower().split(",")
-                )
-                for attribute in user_attributes_to_drop:
-                    attributes_to_drop.append(attribute)
-        except Exception as e:
-            logger = get_logger("gitlab-exporter", "custom-parsers")
-            context = LogContext(
-                service_name="gitlab-exporter",
-                component="custom-parsers",
-                operation="parse_attributes",
-            )
-            logger.error(
-                "Unable to parse GLAB_ATTRIBUTES_DROP, check your configuration",
-                context,
-                exception=e,
-            )
 
     for attribute in obj:
         attribute_name = str(attribute).lower()
@@ -377,28 +403,8 @@ def _flatten_array(array, prefix):
 
 
 def parse_metrics_attributes(attributes):
-    metrics_attributes_to_keep = ["service.name", "status", "stage", "name"]
+    metrics_attributes_to_keep = ["service.name", "status", "stage", "name"] + _DIMENSION_METRICS
     metrics_attributes = {}
-    if "GLAB_DIMENSION_METRICS" in os.environ:
-        try:
-            if os.getenv("GLAB_DIMENSION_METRICS") != "":
-                user_attributes_to_keep = (
-                    str(os.getenv("GLAB_DIMENSION_METRICS")).lower().split(",")
-                )
-                for attribute in user_attributes_to_keep:
-                    metrics_attributes_to_keep.append(attribute)
-        except Exception as e:
-            logger = get_logger("gitlab-exporter", "custom-parsers")
-            context = LogContext(
-                service_name="gitlab-exporter",
-                component="custom-parsers",
-                operation="parse_metrics_attributes",
-            )
-            logger.error(
-                "Unable to parse GLAB_DIMENSION_METRICS, exporting with default dimensions, check your configuration",
-                context,
-                exception=e,
-            )
 
     for attribute in attributes:
         if (
@@ -408,15 +414,8 @@ def parse_metrics_attributes(attributes):
                 str(attribute).lower()
             ]
 
-    if "queued_duration" in attributes:
-        queued_duration = float(attributes["queued_duration"])
-    else:
-        queued_duration = 0
-
-    if "duration" in attributes:
-        duration = float(attributes["duration"])
-    else:
-        duration = 0
+    queued_duration = float(attributes.get("queued_duration") or 0)
+    duration = float(attributes.get("duration") or 0)
 
     # Log attributes debug information
     log_attributes_debug(metrics_attributes, "parse_metrics_attributes")

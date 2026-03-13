@@ -14,3 +14,4 @@ examples/
 job.log
 .coverage
 htmlcov/
+new_relic_resources/
