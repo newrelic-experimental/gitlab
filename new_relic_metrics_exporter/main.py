@@ -31,7 +31,7 @@ from shared.global_variables import (
     GLAB_EXPORT_LAST_MINUTES,
     GLAB_EXPORT_ALL_PROJECTS,
 )
-from get_resources import EnhancedResourceCollector, global_logger, global_meter, reset_collection_flags
+from get_resources import EnhancedResourceCollector, global_logger, global_meter, reset_collection_flags, emit_collection_summary
 from shared.otel import shutdown_otel_providers
 
 
