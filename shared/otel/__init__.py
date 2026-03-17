@@ -28,7 +28,9 @@ def _debug_print(message: str):
         print(f"[OTEL_DEBUG] {message}", file=sys.stderr, flush=True)
 
 
-def shutdown_otel_providers(logger, tracer_provider=None, meter_provider=None, meter=None):
+def shutdown_otel_providers(
+    logger, tracer_provider=None, meter_provider=None, meter=None
+):
     """
     Shutdown all OTEL providers, flushing any queued telemetry before exit.
 
@@ -77,16 +79,59 @@ def shutdown_otel_providers(logger, tracer_provider=None, meter_provider=None, m
     return shutdown_successful
 
 
+# Attributes always promoted to resource level, regardless of GLAB_ATTRIBUTES_TO_KEEP
+_DEFAULT_REQUIRED_ATTRS = frozenset([
+    # Entity identifiers
+    "id",
+    "project_id",
+    "pipeline_id",
+    "job_id",
+    "environment_id",
+    "deployment_id",
+    "release_id",
+    # OTel / GitLab metadata
+    "service.name",
+    "gitlab.resource.type",
+    "gitlab.source",
+    # Dashboard-critical filtering/grouping attributes
+    "status",
+    "stage",
+    "online",
+    "failure_reason",
+    "entity.name",
+    "finished_at",
+    "description",
+])
+
+# Cache user-configured keep list at module level — env vars don't change at runtime
+_ATTRIBUTES_TO_KEEP: list = [
+    a.strip()
+    for a in os.getenv("GLAB_ATTRIBUTES_TO_KEEP", "").split(",")
+    if a.strip()
+]
+
+
 def create_resource_attributes(atts, GLAB_SERVICE_NAME):
+    """
+    Build resource-level attributes for an OpenTelemetry Resource.
+
+    Only required system attributes and user-specified GLAB_ATTRIBUTES_TO_KEEP
+    attributes are promoted to resource level. All other attributes should be
+    passed as log-record-level attributes so the SDK can manage truncation via
+    OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT.
+    """
+    required_attrs = _DEFAULT_REQUIRED_ATTRS | frozenset(_ATTRIBUTES_TO_KEEP)
+
     attributes = {SERVICE_NAME: GLAB_SERVICE_NAME}
 
-    for att in atts:
-        # Only filter out None values and empty strings - rely on do_parse() for validation
-        if atts[att] is not None and atts[att] != "" and atts[att] != "None":
-            if att != "name":
-                attributes[att] = atts[att]
-            else:
-                attributes["resource.name"] = atts[att]
+    for key in required_attrs:
+        if (
+            key in atts
+            and atts[key] is not None
+            and atts[key] != ""
+            and atts[key] != "None"
+        ):
+            attributes[key] = atts[key]
 
     # Log attributes debug information
     log_attributes_debug(attributes, "create_resource_attributes")
@@ -237,5 +282,3 @@ def get_tracer(endpoint, headers, resource, tracer):
     tracer = trace.get_tracer(__name__, tracer_provider=tracer_provider)
     _debug_print(f"get_tracer() completed successfully - tracer ready")
     return tracer
-
-
