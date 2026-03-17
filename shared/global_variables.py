@@ -120,14 +120,35 @@ else:
             "Set GLAB_EXPORT_PATHS or set GLAB_EXPORT_PATHS_ALL=true to enable detailed export."
         )
 
+# Size the connection pool to match total worker concurrency so urllib3 doesn't
+# discard connections (and force new TCP+TLS handshakes) under parallel load.
+# Pass the pre-configured session directly into Gitlab() so it is used by
+# RequestsBackend from the very first request.
+# Retry with exponential backoff on 429/5xx; respects GitLab's Retry-After header.
+from requests import Session as _Session
+from requests.adapters import HTTPAdapter as _HTTPAdapter
+from urllib3.util.retry import Retry as _Retry
+_pool_size = int(os.getenv("GLAB_API_WORKERS", "50")) + int(os.getenv("GLAB_JOB_WORKERS", "20"))
+_gl_retry = _Retry(
+    total=5,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    respect_retry_after_header=True,
+    raise_on_status=False,
+)
+_gl_session = _Session()
+_gl_adapter = _HTTPAdapter(pool_connections=_pool_size, pool_maxsize=_pool_size, max_retries=_gl_retry)
+_gl_session.mount("https://", _gl_adapter)
+_gl_session.mount("http://", _gl_adapter)
+
 # Set gitlab client
 GLAB_ENDPOINT = ""
 if "GLAB_ENDPOINT" in os.environ:
     GLAB_ENDPOINT = os.getenv("GLAB_ENDPOINT")
-    gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT), private_token="{}".format(GLAB_TOKEN))
+    gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT), private_token="{}".format(GLAB_TOKEN), session=_gl_session)
 else:
     GLAB_ENDPOINT = "https://gitlab.com/"
-    gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
+    gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN), session=_gl_session)
 
 # Check project ownership and visibility
 if (
