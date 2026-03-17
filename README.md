@@ -96,6 +96,7 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_EXPORT_LAST_MINUTES` | Time window (in minutes) for collecting event data (pipelines, jobs, deployments, releases). When GLAB_EXPORT_ALL_PROJECTS=False, also applies to project metadata. | True | Integer | 60 |
 | `GLAB_EXPORT_ALL_PROJECTS` | When True (default), export all historical data regardless of activity. When False, only export projects with activity within GLAB_EXPORT_LAST_MINUTES window. | True | Boolean | True |
 | `GLAB_ATTRIBUTES_DROP` | Attribute keys to drop from all exported data (log records, spans, parsed entity attributes). Comma-separated. Applied at every export point including OTEL log records. | True | List* | None |
+| `GLAB_ATTRIBUTES_TO_KEEP` | Attribute keys to promote to resource level (in addition to system defaults). Comma-separated. Resource-level attributes are always sent to New Relic. All other attributes are passed as log-record-level attributes, where `OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT` applies. | True | List* | None |
 | `GLAB_DIMENSION_METRICS` | Extra dimensional metric attributes to add to each metric | True | List* | NONE Note the following attributes will always be set as dimensions regardless of this setting: status,stage,name |
 | `GLAB_RUNNERS_SCOPE` | Get runners scope : all, active, paused, online, shared, specific (separated by comma) | True | List* | all |
 | `GLAB_STANDALONE` | Set to True if not running as gitlab pipeline schedule | True | Boolean | False |
@@ -104,7 +105,13 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
 | `OTEL_EXPORTER_TYPE` | OTEL exporter output target. `otlp` sends to New Relic, `console` prints to stderr, `both` does both (useful for debugging) | True | String | otlp |
 | `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
+
 *comma separated
+
+**Attribute Promotion:**
+Attributes are split into two tiers. **Resource-level** attributes are always sent to New Relic. **Log-record-level** attributes are subject to `OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT` and may be dropped on high-volume exports.
+
+The following are always promoted to resource level: `id`, `project_id`, `pipeline_id`, `job_id`, `environment_id`, `deployment_id`, `release_id`, `service.name`, `gitlab.resource.type`, `gitlab.source`, `status`, `stage`, `online`, `failure_reason`, `entity.name`, `finished_at`, `description`. Use `GLAB_ATTRIBUTES_TO_KEEP` to promote additional attributes to resource level.
 
 **Default configuration is based on using Gitlab runners with docker executor**
 
