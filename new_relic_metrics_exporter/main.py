@@ -245,6 +245,8 @@ class GitLabMetricsExporter:
             "total_projects": 0,
             "successful_projects": 0,
             "failed_projects": 0,
+            "exported_projects": 0,
+            "skipped_projects": 0,
             "errors": [],
             "duration_seconds": 0,
         }
@@ -333,6 +335,10 @@ class GitLabMetricsExporter:
                         collection_results["errors"].append(str(result))
                     elif result.get("success", False):
                         collection_results["successful_projects"] += 1
+                        if result.get("metrics_collected", {}).get("metadata_exported", False):
+                            collection_results["exported_projects"] += 1
+                        else:
+                            collection_results["skipped_projects"] += 1
                     else:
                         collection_results["failed_projects"] += 1
                         if result.get("error"):
@@ -407,6 +413,8 @@ class GitLabMetricsExporter:
                     "total_projects": collection_results["total_projects"],
                     "successful_projects": collection_results["successful_projects"],
                     "failed_projects": collection_results["failed_projects"],
+                    "exported_projects": collection_results["exported_projects"],
+                    "skipped_projects": collection_results["skipped_projects"],
                     "errors_count": len(collection_results["errors"]),
                     # Cap lists to avoid oversized OTEL payloads on large instances
                     "failed_projects_sample": failed_projects[:10],

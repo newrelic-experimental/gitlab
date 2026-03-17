@@ -198,6 +198,7 @@ def get_runners():
 
 
 async def grab_data(project):
+    metadata_exported = False
     try:
         GLAB_SERVICE_NAME = generate_service_name(project, _config)
         project_json = json.loads(project.to_json())
@@ -239,6 +240,8 @@ async def grab_data(project):
                     project_name=str(GLAB_SERVICE_NAME),
                 )
                 structured_logger.info("Log events sent for project", context)
+
+            metadata_exported = should_export_project
 
             # Check regex filter — use pre-compiled pattern (compiled once at module load)
             regex_check = _projects_regex.search(project_json["name"])
@@ -373,6 +376,7 @@ async def grab_data(project):
         structured_logger.error(
             "ERROR obtaining data for project", context, exception=e
         )
+    return {"metadata_exported": metadata_exported}
 
 
 def get_dora_metrics(current_project):
@@ -958,13 +962,14 @@ class EnhancedResourceCollector:
             self.logger.info("Starting project data collection", context)
 
             # Use the existing grab_data function
-            await grab_data(project)
+            grab_result = await grab_data(project)
 
             # Return basic metrics about what was collected
             metrics = {
                 "project_id": project.id,
                 "project_name": project.name,
                 "data_collected": True,
+                "metadata_exported": (grab_result or {}).get("metadata_exported", False),
             }
 
             self.logger.info("Project data collection completed", context)
