@@ -251,13 +251,18 @@ class TestAttributeParsing:
             "keep_field": "keep_me",
         }
 
-        with patch.dict(os.environ, env_vars):
-            result = parse_attributes(data)
+        import shared.custom_parsers as cp
+        original = cp._ATTRIBUTES_DROP
+        cp._ATTRIBUTES_DROP = ["sensitive_field", "another_field"]
+        try:
+            result = cp.parse_attributes(data)
 
             assert "id" in result
             assert "keep_field" in result
             assert "sensitive_field" not in result
             assert "another_field" not in result
+        finally:
+            cp._ATTRIBUTES_DROP = original
 
     def test_parse_attributes_handles_list_input(self):
         """Test parse_attributes handles list input."""
@@ -413,8 +418,11 @@ class TestMetricsAttributeParsing:
             "duration": "200.0",
         }
 
-        with patch.dict(os.environ, env_vars):
-            duration, queued_duration, metrics_attrs = parse_metrics_attributes(
+        import shared.custom_parsers as cp
+        original = cp._DIMENSION_METRICS
+        cp._DIMENSION_METRICS = ["custom_field", "another_field"]
+        try:
+            duration, queued_duration, metrics_attrs = cp.parse_metrics_attributes(
                 attributes
             )
 
@@ -423,6 +431,8 @@ class TestMetricsAttributeParsing:
             assert "custom_field" in metrics_attrs
             assert "another_field" in metrics_attrs
             assert "filtered_field" not in metrics_attrs
+        finally:
+            cp._DIMENSION_METRICS = original
 
     def test_parse_metrics_attributes_missing_durations(self):
         """Test parse_metrics_attributes handles missing duration fields."""

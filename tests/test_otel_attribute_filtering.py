@@ -1,111 +1,110 @@
-"""
-Tests for OpenTelemetry attribute filtering to prevent None value warnings.
-
-This test suite ensures that all processors properly filter out None values
-and empty strings from attributes before passing them to OpenTelemetry.
-"""
-
-import pytest
 import os
 from unittest.mock import patch, MagicMock
 from opentelemetry.sdk.resources import Resource
 
 
-class TestEnvironmentVariableFiltering:
-    """Test suite for environment variable filtering in grab_span_att_vars."""
+class TestResourceCreationFiltering:
+    def test_required_and_user_keep_attributes_are_promoted(self, monkeypatch):
+        """Test that only system defaults and GLAB_ATTRIBUTES_TO_KEEP attrs are promoted to resource level."""
+        import shared.otel
+        from shared.otel import create_resource_attributes
 
-    def test_grab_span_att_vars_filters_none_values(self):
-        """Test that grab_span_att_vars filters out None values."""
-        from shared.custom_parsers import grab_span_att_vars
+        # Patch the module-level cache directly (env var is cached at import time)
+        monkeypatch.setattr(shared.otel, "_ATTRIBUTES_TO_KEEP", ["custom1", "custom2"])
 
-        # Mock environment (can't set None in os.environ, so test empty strings)
-        test_env = {
-            "CI_VALID_VAR": "valid_value",
-            "CI_EMPTY_VAR": "",
-            "CI_ZERO_VAR": "0",
-            "CI_FALSE_VAR": "false",
-            "NON_CI_VAR": "should_be_filtered",
+        atts = {
+            "id": 123,
+            "project_id": 456,
+            "pipeline_id": 789,
+            "custom1": "foo",
+            "custom2": "bar",
+            "not_required": "should_not_be_promoted",
+        }
+        service_name = "test_service"
+
+        result = create_resource_attributes(atts, service_name)
+
+        # System defaults present in atts should be promoted
+        default_required = [
+            "id", "project_id", "pipeline_id", "job_id", "environment_id",
+            "deployment_id", "release_id", "service.name", "gitlab.resource.type",
+        ]
+        for key in default_required:
+            if key in atts:
+                assert key in result, f"{key} should be promoted to resource level"
+
+        # User-specified keep attrs should be promoted
+        assert "custom1" in result
+        assert "custom2" in result
+
+        # Non-required attrs must NOT be promoted to resource level
+        assert "not_required" not in result
+
+    def test_resource_creation_with_filtered_attributes(self):
+        """Test that Resource creation works with filtered attributes."""
+        # Test data with None and empty values
+        test_attributes = {
+            "service.name": "test_service",
+            "valid_attr": "valid_value",
+            "none_attr": None,
+            "empty_attr": "",
+            "zero_attr": 0,
+            "false_attr": False,
         }
 
-        with patch.dict(os.environ, test_env, clear=True):
-            result = grab_span_att_vars()
-
-            # Should include valid values
-            assert "CI_VALID_VAR" in result
-            assert result["CI_VALID_VAR"] == "valid_value"
-            assert "CI_ZERO_VAR" in result
-            assert result["CI_ZERO_VAR"] == "0"
-            assert "CI_FALSE_VAR" in result
-            assert result["CI_FALSE_VAR"] == "false"
-
-            # Should exclude empty values
-            assert "CI_EMPTY_VAR" not in result
-
-            # Should exclude non-CI variables
-            assert "NON_CI_VAR" not in result
-
-    def test_grab_span_att_vars_filters_empty_strings(self):
-        """Test that grab_span_att_vars filters out empty strings."""
-        from shared.custom_parsers import grab_span_att_vars
-
-        test_env = {"CI_EMPTY_STRING": "", "CI_WHITESPACE": "   ", "CI_VALID": "value"}
-
-        with patch.dict(os.environ, test_env, clear=True):
-            result = grab_span_att_vars()
-
-            # Should exclude empty string but include whitespace and valid values
-            assert "CI_EMPTY_STRING" not in result
-            assert "CI_WHITESPACE" in result  # Whitespace is not empty string
-            assert "CI_VALID" in result
-
-    def test_grab_span_att_vars_handles_sensitive_vars(self):
-        """Test that grab_span_att_vars filters out sensitive variables."""
-        from shared.custom_parsers import grab_span_att_vars
-
-        test_env = {
-            "CI_VALID_VAR": "valid",
-            "NEW_RELIC_API_KEY": "secret_key",
-            "GLAB_TOKEN": "secret_token",
-            "CI_JOB_JWT": "jwt_token",
-            "CI_BUILD_TOKEN": "build_token",
+        # Apply the same filtering logic used in the processors
+        filtered_attributes = {
+            key: value
+            for key, value in test_attributes.items()
+            if value is not None and value != ""
         }
 
-        with patch.dict(os.environ, test_env, clear=True):
-            result = grab_span_att_vars()
+        from opentelemetry.sdk.resources import Resource
 
-            # Should include valid CI vars
-            assert "CI_VALID_VAR" in result
+        resource = Resource(attributes=filtered_attributes)
 
-            # Should exclude sensitive vars
-            assert "NEW_RELIC_API_KEY" not in result
-            assert "GLAB_TOKEN" not in result
-            assert "CI_JOB_JWT" not in result
-            assert "CI_BUILD_TOKEN" not in result
+        assert isinstance(resource, Resource)
+        attrs = dict(resource.attributes)
+        for key, value in attrs.items():
+            assert value is not None, f"Found None value for key: {key}"
+            assert value != "", f"Found empty string for key: {key}"
+        assert attrs["service.name"] == "test_service"
+        assert attrs["valid_attr"] == "valid_value"
+        assert attrs["zero_attr"] == 0
+        assert attrs["false_attr"] == False
 
-    def test_grab_span_att_vars_custom_drop_list(self):
-        """Test that grab_span_att_vars respects GLAB_ENVS_DROP configuration."""
-        from shared.custom_parsers import grab_span_att_vars
-
-        test_env = {
-            "CI_KEEP_VAR": "keep_this",
-            "CI_DROP_VAR": "drop_this",
-            "CI_ALSO_DROP": "drop_this_too",
-            "GLAB_ENVS_DROP": "CI_DROP_VAR,CI_ALSO_DROP",
+    def test_empty_attributes_handling(self):
+        """Test handling of completely empty attribute dictionaries."""
+        empty_attrs = {}
+        filtered_attrs = {
+            key: value
+            for key, value in empty_attrs.items()
+            if value is not None and value != ""
         }
+        from opentelemetry.sdk.resources import Resource
 
-        with patch.dict(os.environ, test_env, clear=True):
-            result = grab_span_att_vars()
+        resource = Resource(attributes=filtered_attrs)
+        assert isinstance(resource, Resource)
 
-            # Should keep vars not in drop list
-            assert "CI_KEEP_VAR" in result
+    def test_all_none_attributes_handling(self):
+        """Test handling when all attributes are None or empty."""
+        all_none_attrs = {
+            "none_attr1": None,
+            "none_attr2": None,
+            "empty_attr1": "",
+            "empty_attr2": "",
+        }
+        filtered_attrs = {
+            key: value
+            for key, value in all_none_attrs.items()
+            if value is not None and value != ""
+        }
+        from opentelemetry.sdk.resources import Resource
 
-            # Should drop vars in custom drop list
-            assert "CI_DROP_VAR" not in result
-            assert "CI_ALSO_DROP" not in result
-
-            # GLAB_ENVS_DROP starts with GLAB so it should be included but then removed by the drop list
-            # Actually, let's check if it's filtered by the GLAB prefix logic
-            # GLAB_ENVS_DROP should be filtered out by the atts_to_remove list, not the prefix filter
+        assert len(filtered_attrs) == 0
+        resource = Resource(attributes=filtered_attrs)
+        assert isinstance(resource, Resource)
+        # GLAB_ENVS_DROP should be filtered out by the atts_to_remove list, not the prefix filter
 
 
 class TestJobProcessorFiltering:
@@ -305,9 +304,11 @@ class TestParseAttributesFiltering:
             "also_drop": "also_drop_value",
         }
 
-        test_env = {"GLAB_ATTRIBUTES_DROP": "drop_this,also_drop"}
+        import shared.custom_parsers as cp
 
-        with patch.dict(os.environ, test_env, clear=True):
+        original = cp._ATTRIBUTES_DROP
+        cp._ATTRIBUTES_DROP = ["drop_this", "also_drop"]
+        try:
             result = parse_attributes(test_obj)
 
             # Should keep attributes not in drop list
@@ -316,83 +317,134 @@ class TestParseAttributesFiltering:
             # Should drop attributes in custom drop list
             assert "drop_this" not in result
             assert "also_drop" not in result
+        finally:
+            cp._ATTRIBUTES_DROP = original
 
 
-class TestResourceCreationFiltering:
-    """Test suite for OpenTelemetry Resource creation with filtered attributes."""
+class TestFilterOtelLogAttributes:
+    """Test suite for filter_otel_log_attributes function."""
 
-    def test_resource_creation_with_filtered_attributes(self):
-        """Test that Resource creation works with filtered attributes."""
-        # Test data with None and empty values
-        test_attributes = {
-            "service.name": "test_service",
-            "valid_attr": "valid_value",
-            "none_attr": None,
-            "empty_attr": "",
-            "zero_attr": 0,
-            "false_attr": False,
-        }
+    def test_removes_none_values(self):
+        """filter_otel_log_attributes drops None values."""
+        from shared.custom_parsers import filter_otel_log_attributes
 
-        # Apply the same filtering logic used in the processors
-        filtered_attributes = {
-            key: value
-            for key, value in test_attributes.items()
-            if value is not None and value != ""
-        }
+        result = filter_otel_log_attributes({"key": None, "valid": "ok"})
+        assert "key" not in result
+        assert result["valid"] == "ok"
 
-        # Create Resource with filtered attributes
-        resource = Resource(attributes=filtered_attributes)
+    def test_removes_empty_string(self):
+        """filter_otel_log_attributes drops empty string values."""
+        from shared.custom_parsers import filter_otel_log_attributes
 
-        # Verify resource was created successfully
-        assert isinstance(resource, Resource)
+        result = filter_otel_log_attributes({"key": "", "valid": "ok"})
+        assert "key" not in result
 
-        # Verify attributes don't contain None or empty values
-        attrs = dict(resource.attributes)
-        for key, value in attrs.items():
-            assert value is not None, f"Found None value for key: {key}"
-            assert value != "", f"Found empty string for key: {key}"
+    def test_removes_none_string(self):
+        """filter_otel_log_attributes drops the string 'None'."""
+        from shared.custom_parsers import filter_otel_log_attributes
 
-        # Verify valid values are preserved
-        assert attrs["service.name"] == "test_service"
-        assert attrs["valid_attr"] == "valid_value"
-        assert attrs["zero_attr"] == 0
-        assert attrs["false_attr"] == False
+        result = filter_otel_log_attributes({"key": "None", "valid": "ok"})
+        assert "key" not in result
 
-    def test_empty_attributes_handling(self):
-        """Test handling of completely empty attribute dictionaries."""
-        # Empty attributes should not cause issues
-        empty_attrs = {}
-        filtered_attrs = {
-            key: value
-            for key, value in empty_attrs.items()
-            if value is not None and value != ""
-        }
+    def test_all_invalid_values_dropped(self):
+        """filter_otel_log_attributes drops all invalid values at once."""
+        from shared.custom_parsers import filter_otel_log_attributes
 
-        # Should be able to create Resource with empty attributes
-        resource = Resource(attributes=filtered_attrs)
-        assert isinstance(resource, Resource)
+        result = filter_otel_log_attributes({"k1": None, "k2": "None", "k3": ""})
+        assert result == {}
 
-    def test_all_none_attributes_handling(self):
-        """Test handling when all attributes are None or empty."""
-        all_none_attrs = {
-            "none_attr1": None,
-            "none_attr2": None,
-            "empty_attr1": "",
-            "empty_attr2": "",
-        }
+    def test_preserves_zero_and_false(self):
+        """filter_otel_log_attributes keeps 0 and False (valid values)."""
+        from shared.custom_parsers import filter_otel_log_attributes
 
-        filtered_attrs = {
-            key: value
-            for key, value in all_none_attrs.items()
-            if value is not None and value != ""
-        }
+        result = filter_otel_log_attributes({"zero": 0, "flag": False, "valid": "ok"})
+        assert result["zero"] == 0
+        assert result["flag"] is False
+        assert result["valid"] == "ok"
 
-        # Should result in empty attributes dict
-        assert len(filtered_attrs) == 0
+    def test_drops_sensitive_attributes(self):
+        """filter_otel_log_attributes drops hardcoded sensitive keys."""
+        from shared.custom_parsers import filter_otel_log_attributes
 
-        # Should be able to create Resource with empty attributes
-        resource = Resource(attributes=filtered_attrs)
-        assert isinstance(resource, Resource)
+        result = filter_otel_log_attributes(
+            {
+                "NEW_RELIC_API_KEY": "secret",
+                "GLAB_TOKEN": "secret",
+                "CI_JOB_JWT": "token",
+                "CI_JOB_TOKEN": "token",
+                "CI_BUILD_TOKEN": "token",
+                "CI_REGISTRY_PASSWORD": "password",
+                "CI_DEPLOY_PASSWORD": "password",
+                "CI_SERVER_TLS_KEY_FILE": "/path/to/key",
+                "CI_SERVER_TLS_CERT_FILE": "/path/to/cert",
+                "valid_attr": "keep",
+            }
+        )
+        assert "NEW_RELIC_API_KEY" not in result
+        assert "GLAB_TOKEN" not in result
+        assert "CI_JOB_JWT" not in result
+        assert "CI_JOB_TOKEN" not in result
+        assert "CI_BUILD_TOKEN" not in result
+        assert "CI_REGISTRY_PASSWORD" not in result
+        assert "CI_DEPLOY_PASSWORD" not in result
+        assert "CI_SERVER_TLS_KEY_FILE" not in result
+        assert "CI_SERVER_TLS_CERT_FILE" not in result
+        assert result["valid_attr"] == "keep"
+
+    def test_sensitive_key_check_is_case_insensitive(self):
+        """Sensitive key matching is case-insensitive."""
+        from shared.custom_parsers import filter_otel_log_attributes
+
+        result = filter_otel_log_attributes(
+            {
+                "new_relic_api_key": "secret",
+                "Glab_Token": "secret",
+            }
+        )
+        assert "new_relic_api_key" not in result
+        assert "Glab_Token" not in result
+
+    def test_honors_glab_attributes_drop(self):
+        """filter_otel_log_attributes respects GLAB_ATTRIBUTES_DROP."""
+        from shared.custom_parsers import filter_otel_log_attributes
+        import shared.custom_parsers as cp
+
+        original = cp._ATTRIBUTES_DROP
+        cp._ATTRIBUTES_DROP = ["status", "stage"]
+        try:
+            result = filter_otel_log_attributes(
+                {
+                    "status": "success",
+                    "stage": "build",
+                    "name": "my-job",
+                }
+            )
+            assert "status" not in result
+            assert "stage" not in result
+            assert result["name"] == "my-job"
+        finally:
+            cp._ATTRIBUTES_DROP = original
+
+    def test_glab_attributes_drop_is_case_insensitive(self):
+        """GLAB_ATTRIBUTES_DROP matching is case-insensitive (stored lowercase)."""
+        from shared.custom_parsers import filter_otel_log_attributes
+        import shared.custom_parsers as cp
+
+        # Cache stores lowercase; test that lowercase entries filter case-insensitively
+        original = cp._ATTRIBUTES_DROP
+        cp._ATTRIBUTES_DROP = ["status", "stage"]
+        try:
+            result = filter_otel_log_attributes(
+                {
+                    "Status": "success",
+                    "STAGE": "build",
+                    "name": "my-job",
+                }
+            )
+            assert "Status" not in result
+            assert "STAGE" not in result
+        finally:
+            cp._ATTRIBUTES_DROP = original
 
 
 class TestIntegrationFiltering:

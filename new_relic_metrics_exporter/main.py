@@ -7,7 +7,10 @@ with proper error handling, performance monitoring, and structured logging.
 
 import asyncio
 import datetime
+import os
 import time
+import logging
+import sys
 from typing import List, Dict, Any, Optional
 import schedule
 from shared.logging import get_logger, LogContext
@@ -26,8 +29,10 @@ from shared.global_variables import (
     GLAB_PROJECT_OWNERSHIP,
     GLAB_STANDALONE,
     GLAB_EXPORT_LAST_MINUTES,
+    GLAB_EXPORT_ALL_PROJECTS,
 )
-from get_resources import EnhancedResourceCollector
+from get_resources import EnhancedResourceCollector, global_logger, global_meter, reset_collection_flags, emit_collection_summary
+from shared.otel import shutdown_otel_providers
 
 
 class GitLabMetricsExporter:
@@ -40,6 +45,7 @@ class GitLabMetricsExporter:
 
     def __init__(self):
         """Initialize the metrics exporter."""
+        # Use StructuredLogger - OTEL will capture these logs via LoggingHandler
         self.logger = get_logger("gitlab-metrics-exporter", "main")
         self.start_time = time.time()
         self.resource_collector = EnhancedResourceCollector()
@@ -91,11 +97,18 @@ class GitLabMetricsExporter:
 
                 for visibility in GLAB_PROJECT_VISIBILITIES:
                     try:
-                        visibility_projects = gl.projects.list(
-                            owned=GLAB_PROJECT_OWNERSHIP,
-                            visibility=visibility,
-                            get_all=True,
-                        )
+                        kwargs = {
+                            "owned": GLAB_PROJECT_OWNERSHIP,
+                            "visibility": visibility,
+                            "get_all": True,
+                        }
+                        # NOTE: Do NOT apply last_activity_after here.
+                        # GitLab does NOT update last_activity_at when pipelines run —
+                        # only code pushes, MRs, issues, etc. trigger it.
+                        # A project with a recent pipeline but no recent commits would be
+                        # silently excluded. Time-windowing is handled inside get_pipelines(),
+                        # get_deployments(), get_releases(), and get_jobs() instead.
+                        visibility_projects = gl.projects.list(**kwargs)
                         projects.extend(visibility_projects)
 
                         self.logger.debug(
@@ -226,59 +239,122 @@ class GitLabMetricsExporter:
             operation="run_collection",
         )
 
+        run_start = time.time()
         collection_results = {
             "start_time": datetime.datetime.now().isoformat(),
             "total_projects": 0,
             "successful_projects": 0,
             "failed_projects": 0,
+            "exported_projects": 0,
+            "skipped_projects": 0,
             "errors": [],
             "duration_seconds": 0,
         }
 
         with self.logger.operation_timer("run_collection", context) as timer:
             try:
-                # Get projects
-                projects = self.get_projects()
+                # Reset per-run flags so scheduled collections each get a fresh log entry
+                reset_collection_flags()
+
+                # Get projects — blocking paginated API call; run in executor so
+                # the event loop stays free during the initial project listing.
+                loop = asyncio.get_running_loop()
+                projects = await loop.run_in_executor(None, self.get_projects)
                 collection_results["total_projects"] = len(projects)
 
                 if len(projects) == 0:
                     self.logger.warning("No projects found to export", context)
                     return collection_results
 
-                # Log which projects will be processed
-                project_names = [project.name for project in projects]
-
                 self.logger.info(
                     f"Starting concurrent processing of {len(projects)} projects",
                     context,
-                    extra={
-                        "project_count": len(projects),
-                        "projects": project_names,
-                    },
+                    extra={"project_count": len(projects)},
                 )
 
-                # Create tasks for concurrent processing
-                tasks = [self.process_project(project) for project in projects]
+                # Process projects in batches to allow periodic flushing
+                # This prevents OTEL queue overflow when processing 1000+ projects
+                batch_size = int(os.getenv("GLAB_EXPORT_BATCH_SIZE", "100"))
+                total_batches = (len(projects) + batch_size - 1) // batch_size
 
-                # Process with controlled concurrency
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                self.logger.info(
+                    f"Processing {len(projects)} projects in {total_batches} batches of {batch_size}",
+                    context,
+                    extra={"batch_size": batch_size, "total_batches": total_batches},
+                )
 
-                # Analyze results
+                all_results = []
+                cumulative_queue_stats = {
+                    "total_items": 0, "deployments": 0, "environments": 0,
+                    "releases": 0, "pipelines": 0, "jobs": 0, "errors": 0,
+                }
+                for batch_num in range(total_batches):
+                    start_idx = batch_num * batch_size
+                    end_idx = min(start_idx + batch_size, len(projects))
+                    batch_projects = projects[start_idx:end_idx]
+
+                    self.logger.info(
+                        f"Processing batch {batch_num + 1}/{total_batches} ({len(batch_projects)} projects)",
+                        context,
+                        extra={
+                            "batch_number": batch_num + 1,
+                            "batch_size": len(batch_projects),
+                            "start_index": start_idx,
+                            "end_index": end_idx,
+                        },
+                    )
+
+                    # Create tasks for this batch
+                    batch_tasks = [
+                        self.process_project(project) for project in batch_projects
+                    ]
+
+                    # Process batch with controlled concurrency
+                    batch_results = await asyncio.gather(
+                        *batch_tasks, return_exceptions=True
+                    )
+                    all_results.extend(batch_results)
+
+                    # Drain queue after each batch — safe because get_pipelines now
+                    # awaits all job futures before returning, so the queue is fully
+                    # populated by the time asyncio.gather completes above.
+                    batch_queue_stats = self.resource_collector.process_queue()
+                    for key in cumulative_queue_stats:
+                        cumulative_queue_stats[key] += batch_queue_stats.get(key, 0)
+                    self.logger.debug(
+                        f"Batch {batch_num + 1} queue drained: {batch_queue_stats['total_items']} items",
+                        context,
+                        extra={"batch_number": batch_num + 1, **batch_queue_stats},
+                    )
+
+                # Analyze results from all batches
+                results = all_results
                 for result in results:
                     if isinstance(result, Exception):
                         collection_results["failed_projects"] += 1
                         collection_results["errors"].append(str(result))
                     elif result.get("success", False):
                         collection_results["successful_projects"] += 1
+                        if result.get("metrics_collected", {}).get("metadata_exported", False):
+                            collection_results["exported_projects"] += 1
+                        else:
+                            collection_results["skipped_projects"] += 1
                     else:
                         collection_results["failed_projects"] += 1
                         if result.get("error"):
                             collection_results["errors"].append(result["error"])
 
+                self.logger.info(
+                    f"All {len(projects)} projects processed across {total_batches} batches",
+                    context,
+                    extra={"total_projects": len(projects), "batches": total_batches},
+                )
+
                 # Collect runners data
                 try:
                     await self.resource_collector.collect_runners_data()
                     self.logger.info("Runners data collection completed", context)
+
                 except Exception as e:
                     self.logger.error(
                         "Failed to collect runners data", context, exception=e
@@ -287,7 +363,33 @@ class GitLabMetricsExporter:
                         f"Runners collection failed: {e}"
                     )
 
-                collection_results["duration_seconds"] = time.time() - self.start_time
+                # Final queue drain — catches runners data added after the batch loop
+                try:
+                    final_queue_stats = self.resource_collector.process_queue()
+                    for key in cumulative_queue_stats:
+                        cumulative_queue_stats[key] += final_queue_stats.get(key, 0)
+                    self.logger.info(
+                        "Queue processing completed",
+                        context,
+                        extra={"queue_stats": cumulative_queue_stats},
+                    )
+                    collection_results["queue_stats"] = cumulative_queue_stats
+
+                except Exception as e:
+                    self.logger.error("Failed to process queue", context, exception=e)
+                    collection_results["errors"].append(f"Queue processing failed: {e}")
+
+                collection_results["duration_seconds"] = time.time() - run_start
+
+                # Emit estate + window summary to New Relic
+                try:
+                    emit_collection_summary(collection_results, projects)
+                    self.logger.info("Collection summary event emitted", context)
+                except Exception as e:
+                    self.logger.error(
+                        "Failed to emit collection summary", context, exception=e
+                    )
+
                 timer["success"] = True
 
                 # Log completion summary with project details
@@ -306,9 +408,17 @@ class GitLabMetricsExporter:
                             )
 
                 completion_summary = {
-                    **collection_results,
-                    "successful_projects_list": successful_projects,
-                    "failed_projects_list": failed_projects,
+                    "start_time": collection_results["start_time"],
+                    "duration_seconds": collection_results["duration_seconds"],
+                    "total_projects": collection_results["total_projects"],
+                    "successful_projects": collection_results["successful_projects"],
+                    "failed_projects": collection_results["failed_projects"],
+                    "exported_projects": collection_results["exported_projects"],
+                    "skipped_projects": collection_results["skipped_projects"],
+                    "errors_count": len(collection_results["errors"]),
+                    # Cap lists to avoid oversized OTEL payloads on large instances
+                    "failed_projects_sample": failed_projects[:10],
+                    "queue_stats": collection_results.get("queue_stats", {}),
                 }
 
                 self.logger.info(
@@ -338,17 +448,10 @@ class GitLabMetricsExporter:
 
         try:
             # Run initial collection
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            try:
-                results = loop.run_until_complete(self.run_collection())
-                self.logger.log_performance_metrics(
-                    "initial_collection", results, context
-                )
-            finally:
-                loop.close()
-                asyncio.set_event_loop(None)
+            results = asyncio.run(self.run_collection())
+            self.logger.log_performance_metrics(
+                "initial_collection", results, context
+            )
 
             # Schedule recurring collections
             schedule.every(int(GLAB_EXPORT_LAST_MINUTES)).minutes.do(
@@ -396,19 +499,13 @@ class GitLabMetricsExporter:
 
         self.logger.info("Starting scheduled collection", context)
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         try:
-            results = loop.run_until_complete(self.run_collection())
+            results = asyncio.run(self.run_collection())
             self.logger.log_performance_metrics(
                 "scheduled_collection", results, context
             )
         except Exception as e:
             self.logger.error("Scheduled collection failed", context, exception=e)
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
 
 
 def main():
@@ -420,25 +517,18 @@ def main():
             exporter.run_standalone_mode()
         else:
             # Run once
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            results = asyncio.run(exporter.run_collection())
+            context = LogContext(
+                service_name="gitlab-metrics-exporter",
+                component="main",
+                operation="main",
+            )
+            exporter.logger.info(
+                "Collection completed", context, extra={"results": results}
+            )
 
-            try:
-                results = loop.run_until_complete(exporter.run_collection())
-                context = LogContext(
-                    service_name="gitlab-metrics-exporter",
-                    component="main",
-                    operation="main",
-                )
-                exporter.logger.info(
-                    "Collection completed", context, extra={"results": results}
-                )
-            finally:
-                loop.close()
-                asyncio.set_event_loop(None)
-
-                if hasattr(gl, "session"):
-                    gl.session.close()
+            if hasattr(gl, "session"):
+                gl.session.close()
 
     except Exception as e:
         context = LogContext(
@@ -450,6 +540,21 @@ def main():
             "Fatal error in metrics exporter", context, exception=e
         )
         raise
+    finally:
+        # Shutdown OTEL providers to ensure all data is exported
+        shutdown_start = time.time()
+        print(
+            f"[MAIN] Initiating OTEL shutdown at {time.strftime('%H:%M:%S')}...",
+            file=sys.stderr,
+            flush=True,
+        )
+        shutdown_success = shutdown_otel_providers(global_logger, meter=global_meter)
+        shutdown_duration = time.time() - shutdown_start
+        print(
+            f"[MAIN] OTEL shutdown {'successful' if shutdown_success else 'completed with warnings'} in {shutdown_duration:.2f}s",
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

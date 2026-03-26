@@ -10,7 +10,7 @@ from typing import Dict, Any, Tuple, List
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from opentelemetry.trace import Status, StatusCode
-from shared.custom_parsers import do_time, grab_span_att_vars, parse_attributes
+from shared.custom_parsers import do_time, grab_span_att_vars, parse_attributes, log_attributes_debug
 from shared.otel import get_tracer
 from shared.logging.structured_logger import get_logger, LogContext
 from shared.utils import generate_service_name
@@ -64,6 +64,9 @@ class PipelineProcessor(BaseProcessor):
             for key, value in attributes.items()
             if value is not None and value != ""
         }
+
+        # Log attributes debug information
+        log_attributes_debug(filtered_attributes, "PipelineProcessor.create_pipeline_resource")
 
         return Resource(attributes=filtered_attributes)
 
@@ -141,6 +144,8 @@ class PipelineProcessor(BaseProcessor):
                 for key, value in pipeline_attributes.items()
                 if value is not None and value != ""
             }
+            # Log attributes debug information
+            log_attributes_debug(filtered_attributes, "PipelineProcessor.create_pipeline_span.set_attributes")
             pipeline_span.set_attributes(filtered_attributes)
 
         # Set error status if pipeline failed

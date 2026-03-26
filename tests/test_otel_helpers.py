@@ -8,10 +8,12 @@ from unittest.mock import MagicMock, patch, Mock
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from shared.otel import (
     create_resource_attributes,
-    get_logger,
+    get_otel_logger,
     get_meter,
     get_tracer,
 )
+# alias for test readability
+get_logger = get_otel_logger
 
 
 class TestCreateResourceAttributes:

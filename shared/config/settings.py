@@ -44,7 +44,7 @@ class GitLabConfig:
 
     # Time-based filtering
     export_last_minutes: int = 61
-    export_all_projects: bool = True
+    export_all_projects: bool = False
 
     # Runner settings
     runners_instance: bool = True

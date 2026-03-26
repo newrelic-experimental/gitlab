@@ -20,6 +20,7 @@ global GLAB_EXPORT_PATHS
 global GLAB_ENDPOINT
 global gl
 global OTEL_EXPORTER_OTEL_ENDPOINT
+global OTEL_EXPORTER_TYPE
 global endpoint
 global headers
 global paths
@@ -30,6 +31,17 @@ global GLAB_RUNNERS_INSTANCE
 
 # Initializing a queue
 q = Queue()
+
+# OTEL defaults — applied only if not already set in the environment
+# Customers can override any of these via their own environment variables
+os.environ.setdefault("OTEL_ATTRIBUTE_COUNT_LIMIT", "64")
+os.environ.setdefault("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "4096")
+os.environ.setdefault("OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT", "64")
+os.environ.setdefault("OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT", "4096")
+os.environ.setdefault("OTEL_BLRP_SCHEDULE_DELAY", "2000")
+os.environ.setdefault("OTEL_BLRP_MAX_QUEUE_SIZE", "20000")
+os.environ.setdefault("OTEL_BLRP_MAX_EXPORT_BATCH_SIZE", "2000")
+os.environ.setdefault("OTEL_EXPORTER_OTLP_TIMEOUT", "60000")
 
 GLAB_DORA_METRICS = False
 GLAB_EXPORT_LOGS = True
@@ -59,8 +71,6 @@ if (
     and os.getenv("GLAB_RUNNERS_INSTANCE").lower() == "false"
 ):
     GLAB_RUNNERS_INSTANCE = False
-else:
-    GLAB_RUNNERS_INSTANCE = True
 
 
 # Check export logs is set
@@ -101,16 +111,44 @@ else:
 if GLAB_EXPORT_PATHS != "":
     paths = GLAB_EXPORT_PATHS.split(",")
 else:
-    paths = ""
+    paths = []
+    if not GLAB_EXPORT_PATHS_ALL:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "GLAB_EXPORT_PATHS is not set and GLAB_EXPORT_PATHS_ALL is False. "
+            "Detailed resource data (pipelines, deployments, etc.) will NOT be exported for any project. "
+            "Set GLAB_EXPORT_PATHS or set GLAB_EXPORT_PATHS_ALL=true to enable detailed export."
+        )
+
+# Size the connection pool to match total worker concurrency so urllib3 doesn't
+# discard connections (and force new TCP+TLS handshakes) under parallel load.
+# Pass the pre-configured session directly into Gitlab() so it is used by
+# RequestsBackend from the very first request.
+# Retry with exponential backoff on 429/5xx; respects GitLab's Retry-After header.
+from requests import Session as _Session
+from requests.adapters import HTTPAdapter as _HTTPAdapter
+from urllib3.util.retry import Retry as _Retry
+_pool_size = int(os.getenv("GLAB_API_WORKERS", "50")) + int(os.getenv("GLAB_JOB_WORKERS", "20"))
+_gl_retry = _Retry(
+    total=5,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    respect_retry_after_header=True,
+    raise_on_status=False,
+)
+_gl_session = _Session()
+_gl_adapter = _HTTPAdapter(pool_connections=_pool_size, pool_maxsize=_pool_size, max_retries=_gl_retry)
+_gl_session.mount("https://", _gl_adapter)
+_gl_session.mount("http://", _gl_adapter)
 
 # Set gitlab client
 GLAB_ENDPOINT = ""
 if "GLAB_ENDPOINT" in os.environ:
     GLAB_ENDPOINT = os.getenv("GLAB_ENDPOINT")
-    gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT), private_token="{}".format(GLAB_TOKEN))
+    gl = gitlab.Gitlab(url=str(GLAB_ENDPOINT), private_token="{}".format(GLAB_TOKEN), session=_gl_session)
 else:
     GLAB_ENDPOINT = "https://gitlab.com/"
-    gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN))
+    gl = gitlab.Gitlab(private_token="{}".format(GLAB_TOKEN), session=_gl_session)
 
 # Check project ownership and visibility
 if (
@@ -147,6 +185,14 @@ else:
         OTEL_EXPORTER_OTEL_ENDPOINT = "https://otlp.eu01.nr-data.net:4318"
     else:
         OTEL_EXPORTER_OTEL_ENDPOINT = "https://otlp.nr-data.net:4318"
+
+# Check which exporter type to use (otlp, console, or both)
+if "OTEL_EXPORTER_TYPE" in os.environ:
+    OTEL_EXPORTER_TYPE = os.getenv("OTEL_EXPORTER_TYPE").lower()
+    if OTEL_EXPORTER_TYPE not in ["otlp", "console", "both"]:
+        OTEL_EXPORTER_TYPE = "otlp"  # default to otlp if invalid value
+else:
+    OTEL_EXPORTER_TYPE = "otlp"  # default to otlp
 
 # Check runners scope
 if "GLAB_RUNNERS_SCOPE" in os.environ:
