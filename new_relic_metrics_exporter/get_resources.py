@@ -3,7 +3,6 @@ import os
 import threading
 from datetime import datetime, timedelta, date, timezone
 from typing import Dict, Any
-import pytz
 import zulu
 from opentelemetry.sdk.resources import Resource
 from shared.otel import get_otel_logger, create_resource_attributes, get_meter

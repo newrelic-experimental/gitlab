@@ -51,15 +51,23 @@ class JobProcessor(BaseProcessor):
         Returns:
             Resource instance for the job
         """
+        # Build resource attributes, being careful to skip missing env vars (don't convert None to "None")
         resource_attributes = {
             SERVICE_NAME: service_name,
-            "pipeline_id": str(os.getenv("CI_PARENT_PIPELINE")),
-            "project_id": str(os.getenv("CI_PROJECT_ID")),
             "job_id": str(job["id"]),
             "instrumentation.name": "gitlab-integration",
             "gitlab.source": "gitlab-exporter",
             "gitlab.resource.type": "span",
         }
+
+        # Only add environment variables if they're set
+        pipeline_id = os.getenv("CI_PARENT_PIPELINE")
+        if pipeline_id:
+            resource_attributes["pipeline_id"] = str(pipeline_id)
+
+        project_id = os.getenv("CI_PROJECT_ID")
+        if project_id:
+            resource_attributes["project_id"] = str(project_id)
 
         if not self.config.low_data_mode:
             job_attributes = parse_attributes(job)
@@ -67,11 +75,12 @@ class JobProcessor(BaseProcessor):
                 create_resource_attributes(job_attributes, service_name)
             )
 
-        # Filter out None values and empty strings to prevent OpenTelemetry warnings
+        # Filter out None values, empty strings, and "None" strings to prevent OpenTelemetry warnings
+        # This is a critical pass to ensure Resource attributes are clean
         filtered_resource_attributes = {
             key: value
             for key, value in resource_attributes.items()
-            if value is not None and value != ""
+            if value is not None and value != "" and value != "None"
         }
 
         # Log attributes debug information
@@ -99,6 +108,28 @@ class JobProcessor(BaseProcessor):
             service_name: Service name
             error_status: Whether the job has error status
         """
+        debug_enabled = os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+
+        # Debug: Check resource attributes for None values
+        if debug_enabled:
+            context_init = LogContext(
+                service_name="gitlab-exporter",
+                component="job-processor",
+                operation="handle_job_logs_init",
+                job_id=str(job.get("id", "unknown")),
+            )
+            none_attrs = [k for k, v in resource_attributes.items() if v is None]
+            if none_attrs:
+                self.logger.debug(
+                    f"[INIT] Incoming resource_attributes has {len(none_attrs)} None values",
+                    context_init,
+                    extra={
+                        "none_keys": none_attrs,
+                        "total_attrs": len(resource_attributes),
+                        "attr_names": list(resource_attributes.keys())[:10]
+                    }
+                )
+
         try:
             current_job = self.project.jobs.get(job["id"], lazy=True)
 
@@ -110,28 +141,126 @@ class JobProcessor(BaseProcessor):
             with open("job.log", "rb") as f:
                 count = 1
                 for string in f:
+                    raw_string = string.decode("utf-8", "ignore")
                     txt = str(
-                        self.ansi_escape.sub(" ", str(string.decode("utf-8", "ignore")))
-                    )
+                        self.ansi_escape.sub(" ", str(raw_string))
+                    ).strip()
+
+                    if debug_enabled and count <= 5:  # Log first 5 lines for debugging
+                        context = LogContext(
+                            service_name="gitlab-exporter",
+                            component="job-processor",
+                            operation="handle_job_logs_debug",
+                            job_id=str(job.get("id", "unknown")),
+                        )
+                        self.logger.debug(
+                            f"[RAW] Line {count}: {raw_string[:100]}",
+                            context,
+                            extra={"raw_length": len(raw_string), "line_num": count}
+                        )
+
+                    # Remove timestamp prefix (format: TIMESTAMP LOG_LEVEL MESSAGE)
+                    # Example: "2026-02-09T16:24:37.2141912 010 CI_PROJECT_NAME=..."
+                    txt_before = txt
+                    if txt:
+                        # Look for ISO timestamp pattern followed by whitespace and log level
+                        # Pattern: ISO timestamp (with Z or decimals) + log level (digits or alphanumeric) + message
+                        # Examples:
+                        #   2026-02-09T18:27:22.690736Z 00O  Running with...
+                        #   2026-02-09T16:24:37.2141912 010 CI_PROJECT_NAME=...
+                        timestamp_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[.\d]*Z?\s+[\dA-Za-z]+\s+'
+                        match = re.match(timestamp_pattern, txt)
+
+                        if debug_enabled and count <= 5:
+                            self.logger.debug(
+                                f"[PARSE] Line {count} timestamp pattern match: {match is not None}",
+                                context,
+                                extra={"pattern_matched": match is not None, "txt_start": txt[:80]}
+                            )
+
+                        if match:
+                            # Remove the matched timestamp and log level prefix
+                            txt = txt[match.end():]
+                        else:
+                            # Fallback: try simple space-based splitting
+                            parts = txt.split(' ', 2)
+                            if len(parts) >= 3 and parts[1].isdigit():
+                                txt = parts[2]
+                            elif len(parts) >= 2 and parts[1].isdigit() and len(parts[1]) <= 3:
+                                txt = ' '.join(parts[1:])
+
+                    if debug_enabled and count <= 5 and txt != txt_before:
+                        self.logger.debug(
+                            f"[EXTRACT] Line {count} timestamp removed",
+                            context,
+                            extra={"before": txt_before[:80], "after": txt[:80]}
+                        )
 
                     # Skip empty lines
                     if string.decode("utf-8") != "\n" and len(txt) > 2:
                         attrs = resource_attributes.copy()
                         attrs["log"] = txt
-                        # Filter out None values and empty strings
-                        filtered_attrs = {
-                            key: value
-                            for key, value in attrs.items()
-                            if value is not None and value != "" and value != "None"
-                        }
 
-                        # Create resource for log entry without using OpenTelemetry logger
-                        # This avoids the automatic environment variable injection that causes taskName warnings
-                        resource_log = Resource(attributes=filtered_attrs)
+                        # Filter out None, empty strings, and invalid OTEL attribute types
+                        # CRITICAL: Must completely eliminate None values to prevent OTEL warnings
+                        filtered_attrs = {}
+                        none_attrs_filtered = []
+                        invalid_type_attrs = []
 
-                        # Skip OpenTelemetry logging to avoid automatic taskName injection
-                        # The log data is already captured in the resource attributes
-                        pass
+                        for key, value in attrs.items():
+                            # CRITICAL: Skip None values - this is the main issue causing warnings
+                            if value is None:
+                                none_attrs_filtered.append(key)
+                                continue
+                            # Skip empty strings and string "None"
+                            if value == "" or value == "None":
+                                continue
+                            # Only allow valid OTEL attribute types
+                            if isinstance(value, (bool, str, bytes, int, float)):
+                                filtered_attrs[key] = value
+                            elif isinstance(value, list):
+                                # For lists, skip if empty or if contains None values
+                                if value and all(v is not None for v in value):
+                                    filtered_attrs[key] = value
+                                else:
+                                    invalid_type_attrs.append(key)
+                            elif isinstance(value, dict):
+                                # For dicts, skip (can't be serialized reliably)
+                                invalid_type_attrs.append(key)
+                            else:
+                                # Convert other types to string for safety
+                                try:
+                                    str_value = str(value)
+                                    if str_value and str_value != "None":
+                                        filtered_attrs[key] = str_value
+                                except Exception:
+                                    invalid_type_attrs.append(key)
+
+                        if debug_enabled and count <= 5:
+                            self.logger.debug(
+                                f"[SEND] Line {count} to New Relic - attribute filtering details",
+                                context,
+                                extra={
+                                    "message": txt[:100],
+                                    "attr_count": len(filtered_attrs),
+                                    "filtered_out_none": len(none_attrs_filtered),
+                                    "filtered_out_invalid": len(invalid_type_attrs),
+                                    "none_keys": none_attrs_filtered[:5],
+                                    "invalid_keys": invalid_type_attrs[:5],
+                                    "sent_attrs": list(filtered_attrs.keys())[:10]
+                                }
+                            )
+
+                        # CRITICAL: Final pass to ensure absolutely NO None values reach OpenTelemetry
+                        # This handles edge cases where Resource or logging frameworks add None attributes
+                        final_attrs = {k: v for k, v in filtered_attrs.items() if v is not None and v != "None"}
+
+                        # Send log to New Relic with all attributes
+                        # The message field contains the JSON-formatted log with structured data
+                        # Use final_attrs for both Resource and extra to ensure no None values
+                        otel_logger = get_logger(endpoint, headers, Resource(attributes=final_attrs), "job_logger")
+                        otel_logger.info(txt, extra=final_attrs)
+
                         count += 1
 
         except Exception as e:
@@ -172,7 +301,7 @@ class JobProcessor(BaseProcessor):
             # Look for error message
             match = log_data.split("ERROR: Job failed: ")
             if do_parse(match):
-                return str(match[1])
+                return str(match[1]).strip()
             else:
                 return str(job["failure_reason"])
 
