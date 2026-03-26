@@ -105,6 +105,9 @@ All tests should pass. There are no dummy tests included; all tests validate rea
 | `GLAB_USE_NAMESPACE_SLUG` | Use GitLab namespace slugs for service names instead of display names (e.g. "main-group/sub-group/project" vs "Main Group / Sub Group / Project") | True | Boolean | False |
 | `OTEL_EXPORTER_TYPE` | OTEL exporter output target. `otlp` sends to New Relic, `console` prints to stderr, `both` does both (useful for debugging) | True | String | otlp |
 | `LOG_LEVEL` | Logging level for structured logs | True | String | INFO |
+| `GLAB_API_WORKERS` | Thread pool size for pipeline/deployment/environment/release list() API calls | True | Integer | 50 |
+| `GLAB_JOB_WORKERS` | Thread pool size for per-pipeline job fetches (scales with pipeline volume) | True | Integer | 20 |
+| `GLAB_EXPORT_BATCH_SIZE` | Number of projects processed per batch before draining the OTEL queue | True | Integer | 100 |
 
 *comma separated
 
@@ -119,7 +122,7 @@ If using Kubernetes executors instead, use the below configuration
 
 ```
 image:
-    name: docker.io/dpacheconr/gitlab-exporter:2.2.1
+    name: docker.io/dpacheconr/gitlab-exporter:2.2.2
     entrypoint: [""]
   script:
     - python3 -u /app/main.py
@@ -202,7 +205,7 @@ docker run \
   -e GLAB_EXPORT_PROJECTS_REGEX=".*" \
   -e GLAB_TOKEN="your_gitlab_token" \
   -e NEW_RELIC_API_KEY="your_newrelic_key" \
-  docker.io/dpacheconr/gitlab-metrics-exporter:2.2.1
+  docker.io/dpacheconr/gitlab-metrics-exporter:2.2.2
 ```
 
 ### Option 2: GitLab CI/CD Integration
@@ -213,7 +216,7 @@ Add to your `.gitlab-ci.yml`:
 # For pipeline tracing
 new-relic-export:
   stage: .post
-  image: docker.io/dpacheconr/gitlab-exporter:2.2.1
+  image: docker.io/dpacheconr/gitlab-exporter:2.2.2
   script:
     - python3 -u /app/main.py
   variables:
@@ -223,7 +226,7 @@ new-relic-export:
 
 # For metrics collection (scheduled pipeline)
 new-relic-metrics:
-  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.2.1
+  image: docker.io/dpacheconr/gitlab-metrics-exporter:2.2.2
   script:
     - python3 -u /app/main.py
   variables:
@@ -239,8 +242,8 @@ new-relic-metrics:
 - **New Relic Quickstart**: https://newrelic.com/instant-observability/gitlab
 - **Blog Tutorial**: https://newrelic.com/blog/how-to-relic/monitor-gitlab-with-opentelemetry
 - **Docker Images**: 
-  - `docker.io/dpacheconr/gitlab-exporter:2.2.1`
-  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.2.1`
+  - `docker.io/dpacheconr/gitlab-exporter:2.2.2`
+  - `docker.io/dpacheconr/gitlab-metrics-exporter:2.2.2`
 
 ### Health Monitoring
 
