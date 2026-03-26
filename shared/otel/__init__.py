@@ -158,7 +158,7 @@ def get_otel_logger(endpoint, headers, resource, name, exporter_type="otlp"):
     )
     _debug_print(f"  Endpoint: {endpoint}")
     _debug_print(
-        f"  Headers (first 20 chars): {str(headers)[:20] if headers else 'None'}..."
+        f"  Headers: {'<set>' if headers else 'None'}"
     )
     _debug_print(
         f"  Resource attributes: {resource.attributes if hasattr(resource, 'attributes') else 'N/A'}"
@@ -219,7 +219,7 @@ def get_meter(endpoint, headers, resource, meter):
     _debug_print(f"get_meter() called - meter='{meter}'")
     _debug_print(f"  Endpoint: {endpoint}")
     _debug_print(
-        f"  Headers (first 20 chars): {str(headers)[:20] if headers else 'None'}..."
+        f"  Headers: {'<set>' if headers else 'None'}"
     )
     _debug_print(
         f"  Resource attributes: {resource.attributes if hasattr(resource, 'attributes') else 'N/A'}"
@@ -249,7 +249,7 @@ def get_tracer(endpoint, headers, resource, tracer):
     _debug_print(f"get_tracer() called - tracer='{tracer}'")
     _debug_print(f"  Endpoint: {endpoint}")
     _debug_print(
-        f"  Headers (first 20 chars): {str(headers)[:20] if headers else 'None'}..."
+        f"  Headers: {'<set>' if headers else 'None'}"
     )
     _debug_print(
         f"  Resource attributes: {resource.attributes if hasattr(resource, 'attributes') else 'N/A'}"
