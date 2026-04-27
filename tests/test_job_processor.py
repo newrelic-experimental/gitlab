@@ -222,6 +222,39 @@ class TestJobLogHandling:
         # Verify ANSI codes are processed
         mock_project.jobs.get.assert_called_once()
 
+    @patch("new_relic_exporter.processors.job_processor.get_otel_logger")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=b"CI_JOB_STATUS=success CI_PIPELINE_ID=42\n",
+    )
+    def test_handle_job_logs_calls_otel_logger(self, mock_file, mock_get_otel_logger):
+        """Regression test: get_otel_logger must be called when log lines are processed.
+
+        Catches regressions where the function name is changed in the import
+        but not updated at the call site, causing a NameError at runtime.
+        """
+        mock_logger_instance = MagicMock()
+        mock_get_otel_logger.return_value = mock_logger_instance
+
+        mock_config = MagicMock()
+        mock_project = MagicMock()
+        mock_project.jobs.get.return_value = MagicMock()
+
+        processor = JobProcessor(mock_config, mock_project)
+
+        processor.handle_job_logs(
+            job={"id": 12345},
+            endpoint="https://otlp.nr-data.net",
+            headers="api-key=test",
+            resource_attributes={"job.id": "12345", "service.name": "test"},
+            service_name="test-service",
+            error_status=False,
+        )
+
+        mock_get_otel_logger.assert_called()
+        mock_logger_instance.info.assert_called()
+
 
 class TestErrorMessageExtraction:
     """Test suite for error message extraction."""
