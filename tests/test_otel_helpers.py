@@ -20,67 +20,54 @@ class TestCreateResourceAttributes:
     """Test create_resource_attributes function."""
 
     def test_basic_resource_attributes(self):
-        """Test basic resource attributes creation."""
+        """Test that service.name is always set and only required attributes are promoted."""
         atts = {
-            "key1": "value1",
-            "key2": "value2",
+            "status": "success",   # in _DEFAULT_REQUIRED_ATTRS — should be included
+            "non_required_key": "value",  # not required — should be excluded
         }
         service_name = "test-service"
 
         result = create_resource_attributes(atts, service_name)
 
-        expected = {
-            SERVICE_NAME: "test-service",
-            "key1": "value1",
-            "key2": "value2",
-        }
-
-        assert result == expected
+        assert result[SERVICE_NAME] == "test-service"
+        assert result["status"] == "success"
+        assert "non_required_key" not in result
 
     def test_resource_attributes_with_name_key(self):
-        """Test resource attributes with 'name' key gets converted to 'resource.name'."""
+        """Test that 'name' is not a required attribute and is excluded from resource level."""
         atts = {
             "name": "my-resource",
-            "other_key": "other_value",
+            "status": "success",
         }
         service_name = "test-service"
 
         result = create_resource_attributes(atts, service_name)
 
-        expected = {
-            SERVICE_NAME: "test-service",
-            "resource.name": "my-resource",
-            "other_key": "other_value",
-        }
-
-        assert result == expected
-        assert "name" not in result  # Original 'name' key should not be present
+        # 'name' is not a required resource attribute — it stays at log-record level
+        assert "name" not in result
+        assert "resource.name" not in result
+        assert result["status"] == "success"
+        assert result[SERVICE_NAME] == "test-service"
 
     def test_resource_attributes_filters_none_values(self):
-        """Test that None values are filtered out."""
+        """Test that None, empty, and 'None' string values are filtered even for required attrs."""
         atts = {
-            "valid_key": "valid_value",
-            "none_key": None,
-            "empty_string": "",
-            "none_string": "None",
-            "zero_value": 0,
-            "false_value": False,
+            "status": "success",      # required, valid — included
+            "stage": None,            # required, None — excluded
+            "failure_reason": "",     # required, empty string — excluded
+            "description": "None",   # required, string "None" — excluded
+            "id": "42",               # required, valid — included
         }
         service_name = "test-service"
 
         result = create_resource_attributes(atts, service_name)
 
-        expected = {
-            SERVICE_NAME: "test-service",
-            "valid_key": "valid_value",  # This should be included as it's a valid non-empty string
-            "zero_value": 0,
-            "false_value": False,
-        }
-
-        assert result == expected
-        assert "none_key" not in result
-        assert "empty_string" not in result
-        assert "none_string" not in result
+        assert result[SERVICE_NAME] == "test-service"
+        assert result["status"] == "success"
+        assert result["id"] == "42"
+        assert "stage" not in result
+        assert "failure_reason" not in result
+        assert "description" not in result
 
     def test_resource_attributes_empty_input(self):
         """Test resource attributes with empty input."""
@@ -334,36 +321,33 @@ class TestIntegration:
     """Integration tests for OTEL helper functions."""
 
     def test_create_resource_attributes_integration(self):
-        """Test create_resource_attributes with realistic data."""
+        """Test create_resource_attributes with realistic pipeline data."""
         atts = {
-            "name": "gitlab-pipeline-123",
-            "pipeline_id": "123",
-            "project_id": "456",
-            "status": "success",
-            "ref": "main",
-            "empty_field": "",
-            "null_field": None,
-            "none_string": "None",
+            "name": "gitlab-pipeline-123",  # not required — excluded
+            "pipeline_id": "123",           # required — included
+            "project_id": "456",            # required — included
+            "status": "success",            # required — included
+            "ref": "main",                  # not required — excluded
+            "empty_field": "",              # filtered — excluded
+            "null_field": None,             # filtered — excluded
+            "none_string": "None",          # filtered — excluded
         }
         service_name = "gitlab-exporter"
 
         result = create_resource_attributes(atts, service_name)
 
-        expected = {
-            SERVICE_NAME: "gitlab-exporter",
-            "resource.name": "gitlab-pipeline-123",
-            "pipeline_id": "123",
-            "project_id": "456",
-            "status": "success",
-            "ref": "main",
-        }
-
-        assert result == expected
-        # Ensure filtered fields are not present
+        assert result[SERVICE_NAME] == "gitlab-exporter"
+        assert result["pipeline_id"] == "123"
+        assert result["project_id"] == "456"
+        assert result["status"] == "success"
+        # Non-required attributes stay at log-record level, not resource level
+        assert "ref" not in result
+        assert "name" not in result
+        assert "resource.name" not in result
+        # Filtered fields never appear
         assert "empty_field" not in result
         assert "null_field" not in result
         assert "none_string" not in result
-        assert "name" not in result  # Should be converted to resource.name
 
     @patch("shared.otel.OTLPLogExporter")
     @patch("shared.otel.LoggerProvider")
