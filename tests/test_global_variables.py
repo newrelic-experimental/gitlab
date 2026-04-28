@@ -4,7 +4,7 @@ Tests for global variables initialization and configuration.
 
 import pytest
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 from queue import Queue
 
 
@@ -117,8 +117,9 @@ class TestGlobalVariables:
             import shared.global_variables as gv
 
             # Verify GitLab client was initialized with custom endpoint
+            # session= is a pre-configured requests.Session injected for connection pooling
             mock_gitlab.assert_called_once_with(
-                url="https://custom-gitlab.com", private_token="test-token"
+                url="https://custom-gitlab.com", private_token="test-token", session=ANY
             )
 
     def test_gitlab_client_initialization_default(self):
@@ -139,7 +140,8 @@ class TestGlobalVariables:
             import shared.global_variables as gv
 
             # Verify GitLab client was initialized with default endpoint
-            mock_gitlab.assert_called_once_with(private_token="test-token")
+            # session= is a pre-configured requests.Session injected for connection pooling
+            mock_gitlab.assert_called_once_with(private_token="test-token", session=ANY)
             assert gv.GLAB_ENDPOINT == "https://gitlab.com/"
 
     def test_otel_endpoint_eu_api_key(self):
