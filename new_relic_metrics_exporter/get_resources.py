@@ -218,7 +218,7 @@ async def grab_data(project):
                 last_activity = project_json.get("last_activity_at")
                 if last_activity:
                     should_export_project = zulu.parse(last_activity) >= (
-                        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+                        datetime.now(timezone.utc)
                         - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
                     )
                 else:
@@ -509,7 +509,7 @@ def _sync_fetch_releases(project, cutoff):
 async def get_deployments(current_project, project_id, GLAB_SERVICE_NAME):
     global q
     cutoff = (
-        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+        datetime.now(timezone.utc)
         - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
     )
     loop = asyncio.get_running_loop()
@@ -651,7 +651,7 @@ def parse_release(data):
 async def get_releases(current_project, project_id, GLAB_SERVICE_NAME):
     global q
     cutoff = (
-        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+        datetime.now(timezone.utc)
         - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
     )
     loop = asyncio.get_running_loop()
@@ -750,7 +750,7 @@ async def get_pipelines(current_project, project_id, GLAB_SERVICE_NAME):
         "iterator": True,
         "per_page": 100,
         "updated_after": str(
-            datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+            datetime.now(timezone.utc)
             - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
         ),
         "order_by": "updated_at",
@@ -852,7 +852,7 @@ def get_jobs(pipelineobject, project_id, GLAB_SERVICE_NAME, pipeline_dict):
     current_pipeline_json = pipeline_dict  # reuse the already-serialized dict
     exclude_jobs = _exclude_jobs
     cutoff = (
-        datetime.now(timezone.utc).replace(tzinfo=pytz.utc)
+        datetime.now(timezone.utc)
         - timedelta(minutes=int(GLAB_EXPORT_LAST_MINUTES))
     )
     for job in jobs:

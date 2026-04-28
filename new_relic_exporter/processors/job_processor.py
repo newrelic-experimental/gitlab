@@ -258,7 +258,7 @@ class JobProcessor(BaseProcessor):
                         # Send log to New Relic with all attributes
                         # The message field contains the JSON-formatted log with structured data
                         # Use final_attrs for both Resource and extra to ensure no None values
-                        otel_logger = get_logger(endpoint, headers, Resource(attributes=final_attrs), "job_logger")
+                        otel_logger = get_otel_logger(endpoint, headers, Resource(attributes=final_attrs), "job_logger")
                         otel_logger.info(txt, extra=final_attrs)
 
                         count += 1

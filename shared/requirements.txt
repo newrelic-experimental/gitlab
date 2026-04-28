@@ -13,7 +13,6 @@ python-gitlab==8.1.0
 
 # Date/time handling
 pyrfc3339==2.1.0
-pytz==2026.1.post1
 zulu==2.0.1
 
 # Task scheduling
