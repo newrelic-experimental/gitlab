@@ -6,7 +6,7 @@ opentelemetry-instrumentation==0.61b0
 opentelemetry-instrumentation-logging==0.61b0
 
 # Fix pkg_resources deprecation warning
-setuptools==82.0.1
+setuptools==83.0.0
 
 # GitLab API client
 python-gitlab==8.1.0
