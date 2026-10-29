@@ -1,31 +1,31 @@
 # Core OpenTelemetry dependencies
 opentelemetry-api==1.45.1
-opentelemetry-sdk==1.40.0
-opentelemetry-exporter-otlp-proto-grpc==1.40.0
-opentelemetry-instrumentation==0.61b0
-opentelemetry-instrumentation-logging==0.61b0
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp-proto-grpc==1.45.1
+opentelemetry-instrumentation==0.66b1
+opentelemetry-instrumentation-logging==0.66b1
 
 # Fix pkg_resources deprecation warning
-setuptools==84.1.0
+setuptools==84.2.1
 
 # GitLab API client
-python-gitlab==8.1.0
+python-gitlab==8.6.0
 
 # Date/time handling
-pyrfc3339==2.1.0
+pyrfc3339==2.1.1
 zulu==2.0.1
 
 # Task scheduling
 schedule==1.2.2
 
 # Text processing
-regex==2026.2.28
+regex==2026.9.29
 
 # Data processing
-pandas==3.0.1
+pandas==3.1.0
 
 # HTTP requests
-requests==2.33.0
+requests==2.34.2
 
 # Structured logging
-structlog==25.5.0
+structlog==26.1.0
