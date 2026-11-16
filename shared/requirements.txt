@@ -1,9 +1,9 @@
 # Core OpenTelemetry dependencies
-opentelemetry-api==1.45.1
-opentelemetry-sdk==1.45.1
-opentelemetry-exporter-otlp-proto-grpc==1.45.1
-opentelemetry-instrumentation==0.66b1
-opentelemetry-instrumentation-logging==0.66b1
+opentelemetry-api==1.45.2
+opentelemetry-sdk==1.45.2
+opentelemetry-exporter-otlp-proto-grpc==1.45.2
+opentelemetry-instrumentation==0.66b2
+opentelemetry-instrumentation-logging==0.66b2
 
 # Fix pkg_resources deprecation warning
 setuptools==84.2.1
@@ -19,10 +19,10 @@ zulu==2.0.1
 schedule==1.2.2
 
 # Text processing
-regex==2026.9.29
+regex==2026.11.15
 
 # Data processing
-pandas==3.1.0
+pandas==3.1.1
 
 # HTTP requests
 requests==2.34.2
